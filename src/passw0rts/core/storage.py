@@ -5,7 +5,7 @@ Storage manager for encrypted password data
 import json
 import os
 from pathlib import Path
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict
 from .encryption import EncryptionManager
 from .password_entry import PasswordEntry
 
