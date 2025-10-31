@@ -11,7 +11,7 @@ from rich.panel import Panel
 from rich.prompt import Prompt, Confirm
 
 from passw0rts.core import StorageManager, PasswordEntry
-from passw0rts.utils import PasswordGenerator, TOTPManager
+from passw0rts.utils import PasswordGenerator, TOTPManager, SessionPersistence
 from passw0rts.utils.session_manager import SessionManager
 from .clipboard_handler import ClipboardHandler
 
@@ -117,7 +117,7 @@ def init(storage_path, auto_lock):
 @click.option('--storage-path', type=click.Path(), help='Custom storage path')
 @click.option('--auto-lock', type=int, default=300, help='Auto-lock timeout in seconds')
 def unlock(storage_path, auto_lock):
-    """Unlock and access the password vault"""
+    """Unlock and access the password vault (optional - commands auto-authenticate)"""
     try:
         ctx.storage = StorageManager(storage_path)
         
@@ -125,12 +125,14 @@ def unlock(storage_path, auto_lock):
             console.print("[red]Vault not found. Run 'passw0rts init' first.[/red]")
             sys.exit(1)
         
+        # Initialize session persistence
+        session_persist = SessionPersistence()
+        
         # Get master password
         master_password = Prompt.ask("[bold]Master password[/bold]", password=True)
         
         try:
             ctx.storage.initialize(master_password)
-            # Don't store master password - it's no longer needed after initialization
         except ValueError as e:
             console.print(f"[red]Failed to unlock vault: {e}[/red]")
             sys.exit(1)
@@ -138,6 +140,7 @@ def unlock(storage_path, auto_lock):
         # Check for TOTP
         config_dir = ctx.storage.storage_path.parent
         config_file = config_dir / "config.totp"
+        totp_verified_at = None
         
         if config_file.exists():
             secret = config_file.read_text().strip()
@@ -147,18 +150,31 @@ def unlock(storage_path, auto_lock):
             if not ctx.totp.verify_code(totp_code):
                 console.print("[red]Invalid TOTP code![/red]")
                 sys.exit(1)
+            
+            import time
+            totp_verified_at = time.time()
         
         ctx.authenticated = True
         ctx.session = SessionManager(timeout_seconds=auto_lock)
         ctx.session.unlock()
         
+        # Save session for future commands
+        session_persist.save_session(
+            master_password=master_password,
+            totp_verified_at=totp_verified_at,
+            auto_lock_timeout=auto_lock,
+            storage_path=str(ctx.storage.storage_path) if storage_path else None
+        )
+        
         console.print("[bold green]✓ Vault unlocked successfully![/bold green]")
         console.print(f"Entries: {len(ctx.storage.list_entries())}")
-        console.print(f"Auto-lock: {auto_lock} seconds\n")
+        console.print(f"Auto-lock: {auto_lock} seconds")
+        console.print(f"Session saved: Commands will not require re-authentication until lock\n")
         
         # Show help
         console.print("[dim]Use 'passw0rts list' to see all entries[/dim]")
         console.print("[dim]Use 'passw0rts add' to add a new entry[/dim]")
+        console.print("[dim]Use 'passw0rts lock' to manually lock the vault[/dim]")
         console.print("[dim]Use 'passw0rts --help' for all commands[/dim]")
         
     except Exception as e:
@@ -429,8 +445,32 @@ def destroy(storage_path, force):
             config_file.unlink()
             console.print(f"[green]✓[/green] TOTP config deleted: {config_file}")
         
+        # Clear session
+        session_persist = SessionPersistence()
+        if session_persist.session_exists():
+            session_persist.clear_session()
+            console.print(f"[green]✓[/green] Session cleared")
+        
         console.print("\n[bold green]✓ Vault destroyed successfully![/bold green]")
         console.print("[dim]Run 'passw0rts init' to create a new vault.[/dim]")
+        
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+        sys.exit(1)
+
+
+@main.command()
+def lock():
+    """Lock the vault and clear session"""
+    try:
+        session_persist = SessionPersistence()
+        
+        if session_persist.session_exists():
+            session_persist.clear_session()
+            console.print("[bold green]✓ Vault locked and session cleared![/bold green]")
+            console.print("[dim]You will need to re-authenticate on the next command.[/dim]")
+        else:
+            console.print("[yellow]No active session found.[/yellow]")
         
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]")
@@ -453,7 +493,7 @@ def _check_authenticated():
 
 
 def _auto_authenticate(storage_path=None):
-    """Automatically authenticate by prompting for master password"""
+    """Automatically authenticate using persistent session or by prompting for credentials"""
     try:
         ctx.storage = StorageManager(storage_path)
         
@@ -461,21 +501,76 @@ def _auto_authenticate(storage_path=None):
             console.print("[red]Vault not found. Run 'passw0rts init' first.[/red]")
             return False
         
-        # Get master password
+        # Initialize session persistence
+        session_persist = SessionPersistence()
+        
+        # Check for TOTP config
+        config_dir = ctx.storage.storage_path.parent
+        config_file = config_dir / "config.totp"
+        has_totp = config_file.exists()
+        
+        # Try to load existing session
+        if session_persist.session_exists():
+            # Prompt for master password to unlock session
+            master_password = Prompt.ask("[bold]Master password[/bold]", password=True)
+            session_data = session_persist.load_session(master_password)
+            
+            if session_data:
+                # Session is valid, check if we need TOTP
+                needs_totp = has_totp and not session_persist.is_totp_valid(session_data)
+                
+                # Initialize storage with master password
+                try:
+                    ctx.storage.initialize(master_password)
+                except ValueError as e:
+                    console.print(f"[red]Failed to unlock vault: {e}[/red]")
+                    session_persist.clear_session()
+                    return False
+                
+                # Check TOTP if needed
+                if needs_totp:
+                    secret = config_file.read_text().strip()
+                    ctx.totp = TOTPManager(secret)
+                    
+                    totp_code = Prompt.ask("[bold]TOTP code[/bold] (required once per day)")
+                    if not ctx.totp.verify_code(totp_code):
+                        console.print("[red]Invalid TOTP code![/red]")
+                        return False
+                    
+                    # Update session with new TOTP verification time
+                    import time
+                    session_persist.save_session(
+                        master_password=master_password,
+                        totp_verified_at=time.time(),
+                        auto_lock_timeout=session_data.get('auto_lock_timeout', 300),
+                        storage_path=str(ctx.storage.storage_path) if storage_path else None
+                    )
+                elif has_totp:
+                    # Load TOTP manager but don't verify (already verified today)
+                    secret = config_file.read_text().strip()
+                    ctx.totp = TOTPManager(secret)
+                else:
+                    # Update session activity
+                    session_persist.update_activity(master_password)
+                
+                ctx.authenticated = True
+                ctx.session = SessionManager(timeout_seconds=session_data.get('auto_lock_timeout', 300))
+                ctx.session.unlock()
+                
+                return True
+        
+        # No valid session, do full authentication
         master_password = Prompt.ask("[bold]Master password[/bold]", password=True)
         
         try:
             ctx.storage.initialize(master_password)
-            # Don't store master password - it's no longer needed after initialization
         except ValueError as e:
             console.print(f"[red]Failed to unlock vault: {e}[/red]")
             return False
         
         # Check for TOTP
-        config_dir = ctx.storage.storage_path.parent
-        config_file = config_dir / "config.totp"
-        
-        if config_file.exists():
+        totp_verified_at = None
+        if has_totp:
             secret = config_file.read_text().strip()
             ctx.totp = TOTPManager(secret)
             
@@ -483,10 +578,21 @@ def _auto_authenticate(storage_path=None):
             if not ctx.totp.verify_code(totp_code):
                 console.print("[red]Invalid TOTP code![/red]")
                 return False
+            
+            import time
+            totp_verified_at = time.time()
         
         ctx.authenticated = True
         ctx.session = SessionManager(timeout_seconds=300)
         ctx.session.unlock()
+        
+        # Save session for future use
+        session_persist.save_session(
+            master_password=master_password,
+            totp_verified_at=totp_verified_at,
+            auto_lock_timeout=300,
+            storage_path=str(ctx.storage.storage_path) if storage_path else None
+        )
         
         return True
         
