@@ -8,6 +8,7 @@ setup(
     install_requires=[
         "cryptography>=41.0.7",
         "pyotp>=2.9.0",
+        "qrcode>=8.0",
         "click>=8.1.7",
         "rich>=13.7.0",
         "pyperclip>=1.8.2",

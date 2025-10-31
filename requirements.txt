@@ -1,6 +1,7 @@
 # Core encryption and security
 cryptography==41.0.7
 pyotp==2.9.0
+qrcode==8.2
 
 # CLI
 click==8.1.7
