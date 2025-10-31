@@ -1,0 +1,19 @@
+# Core encryption and security
+cryptography==41.0.7
+pyotp==2.9.0
+
+# CLI
+click==8.1.7
+rich==13.7.0
+pyperclip==1.8.2
+
+# Web UI
+flask==3.0.0
+flask-cors==4.0.0
+
+# Data handling
+pydantic==2.5.3
+
+# Testing
+pytest==7.4.3
+pytest-cov==4.1.0
