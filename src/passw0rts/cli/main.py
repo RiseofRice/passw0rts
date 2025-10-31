@@ -9,7 +9,6 @@ from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
 from rich.prompt import Prompt, Confirm
-from rich import print as rprint
 
 from passw0rts.core import StorageManager, PasswordEntry
 from passw0rts.utils import PasswordGenerator, TOTPManager
