@@ -2,7 +2,6 @@
 Encryption module using AES-256-GCM for secure password storage
 """
 
-import os
 import base64
 import secrets
 from typing import Tuple
