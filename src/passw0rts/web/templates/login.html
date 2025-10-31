@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+
+{% block title %}Login - Passw0rts{% endblock %}
+
+{% block styles %}
+<style>
+    .login-container {
+        max-width: 400px;
+        margin: 100px auto;
+        padding: 40px;
+        background-color: var(--bg-secondary);
+        border-radius: 10px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    
+    .login-header {
+        text-align: center;
+        margin-bottom: 30px;
+    }
+    
+    .login-header h1 {
+        font-size: 32px;
+        margin-bottom: 10px;
+    }
+    
+    .login-header p {
+        color: var(--text-secondary);
+    }
+    
+    .error-message {
+        background-color: var(--danger);
+        color: white;
+        padding: 10px;
+        border-radius: 5px;
+        margin-bottom: 15px;
+        display: none;
+    }
+    
+    .totp-field {
+        display: none;
+    }
+</style>
+{% endblock %}
+
+{% block body %}
+<div class="login-container">
+    <div class="login-header">
+        <h1>🔐 Passw0rts</h1>
+        <p>Secure Password Manager</p>
+    </div>
+    
+    <div id="error-message" class="error-message"></div>
+    
+    <form id="login-form">
+        <label for="master-password">Master Password</label>
+        <input type="password" id="master-password" required autofocus>
+        
+        <div id="totp-field" class="totp-field">
+            <label for="totp-code">TOTP Code</label>
+            <input type="text" id="totp-code" pattern="[0-9]{6}" maxlength="6">
+        </div>
+        
+        <button type="submit" class="button" style="width: 100%;">Unlock Vault</button>
+    </form>
+    
+    <div style="text-align: center; margin-top: 20px;">
+        <button class="theme-toggle button-small" onclick="toggleTheme()">Toggle Theme</button>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const form = document.getElementById('login-form');
+    const errorDiv = document.getElementById('error-message');
+    const totpField = document.getElementById('totp-field');
+    const masterPasswordInput = document.getElementById('master-password');
+    const totpInput = document.getElementById('totp-code');
+    
+    let totpRequired = false;
+    
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const masterPassword = masterPasswordInput.value;
+        const totpCode = totpInput.value;
+        
+        try {
+            const response = await fetch('/api/auth/login', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    master_password: masterPassword,
+                    totp_code: totpCode || null
+                })
+            });
+            
+            const data = await response.json();
+            
+            if (response.ok) {
+                window.location.href = '/';
+            } else {
+                if (data.totp_required && !totpRequired) {
+                    // Show TOTP field
+                    totpRequired = true;
+                    totpField.style.display = 'block';
+                    totpInput.required = true;
+                    totpInput.focus();
+                    errorDiv.textContent = 'TOTP code required';
+                    errorDiv.style.display = 'block';
+                } else {
+                    errorDiv.textContent = data.error || 'Login failed';
+                    errorDiv.style.display = 'block';
+                }
+            }
+        } catch (error) {
+            errorDiv.textContent = 'Connection error';
+            errorDiv.style.display = 'block';
+        }
+    });
+</script>
+{% endblock %}
