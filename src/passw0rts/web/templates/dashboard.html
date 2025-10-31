@@ -268,11 +268,11 @@
                 currentEntry = await response.json();
                 document.getElementById('view-title').textContent = currentEntry.title;
                 document.getElementById('view-details').innerHTML = `
-                    <p><strong>Username:</strong> ${currentEntry.username || 'N/A'}</p>
+                    <p><strong>Username:</strong> ${currentEntry.username ? escapeHtml(currentEntry.username) : 'N/A'}</p>
                     <p><strong>Password:</strong> ${'*'.repeat(currentEntry.password.length)}</p>
-                    <p><strong>URL:</strong> ${currentEntry.url ? `<a href="${currentEntry.url}" target="_blank">${currentEntry.url}</a>` : 'N/A'}</p>
-                    <p><strong>Category:</strong> ${currentEntry.category || 'N/A'}</p>
-                    <p><strong>Notes:</strong> ${currentEntry.notes || 'N/A'}</p>
+                    <p><strong>URL:</strong> ${currentEntry.url ? `<a href="${escapeHtml(currentEntry.url)}" target="_blank">${escapeHtml(currentEntry.url)}</a>` : 'N/A'}</p>
+                    <p><strong>Category:</strong> ${currentEntry.category ? escapeHtml(currentEntry.category) : 'N/A'}</p>
+                    <p><strong>Notes:</strong> ${currentEntry.notes ? escapeHtml(currentEntry.notes) : 'N/A'}</p>
                 `;
                 document.getElementById('view-modal').style.display = 'block';
             }
