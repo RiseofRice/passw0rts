@@ -1,0 +1,438 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Passw0rts{% endblock %}
+
+{% block styles %}
+<style>
+    .dashboard-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+    }
+    
+    .search-box {
+        flex: 1;
+        max-width: 400px;
+        margin: 0 20px;
+    }
+    
+    .entry-card {
+        background-color: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 15px;
+        cursor: pointer;
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+    
+    .entry-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    }
+    
+    .entry-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 10px;
+    }
+    
+    .entry-title {
+        font-size: 18px;
+        font-weight: bold;
+        color: var(--accent);
+    }
+    
+    .entry-meta {
+        color: var(--text-secondary);
+        font-size: 14px;
+    }
+    
+    .modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.7);
+        z-index: 1000;
+    }
+    
+    .modal-content {
+        background-color: var(--bg-primary);
+        max-width: 600px;
+        margin: 50px auto;
+        padding: 30px;
+        border-radius: 10px;
+        max-height: 80vh;
+        overflow-y: auto;
+    }
+    
+    .modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+    }
+    
+    .close {
+        font-size: 28px;
+        cursor: pointer;
+        color: var(--text-secondary);
+    }
+    
+    .password-field {
+        position: relative;
+    }
+    
+    .password-toggle {
+        position: absolute;
+        right: 10px;
+        top: 35px;
+        cursor: pointer;
+        color: var(--text-secondary);
+    }
+    
+    .button-group {
+        display: flex;
+        gap: 10px;
+        margin-top: 20px;
+    }
+    
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+        color: var(--text-secondary);
+    }
+    
+    .category-badge {
+        display: inline-block;
+        padding: 4px 8px;
+        background-color: var(--accent);
+        color: white;
+        border-radius: 4px;
+        font-size: 12px;
+        margin-left: 10px;
+    }
+</style>
+{% endblock %}
+
+{% block body %}
+<header>
+    <div class="header-content">
+        <h1>🔐 Passw0rts</h1>
+        <div style="display: flex; gap: 10px; align-items: center;">
+            <button class="theme-toggle button-small" onclick="toggleTheme()">Toggle Theme</button>
+            <button class="button" onclick="logout()">Logout</button>
+        </div>
+    </div>
+</header>
+
+<div class="container">
+    <div class="dashboard-header">
+        <button class="button" onclick="showAddModal()">➕ Add Entry</button>
+        <input type="text" class="search-box" id="search-input" placeholder="Search passwords...">
+        <button class="button" onclick="generatePassword()">🎲 Generate</button>
+    </div>
+    
+    <div id="entries-container">
+        <div class="empty-state">
+            <h2>Loading...</h2>
+        </div>
+    </div>
+</div>
+
+<!-- View Entry Modal -->
+<div id="view-modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2 id="view-title"></h2>
+            <span class="close" onclick="closeModal('view-modal')">&times;</span>
+        </div>
+        <div id="view-details"></div>
+        <div class="button-group">
+            <button class="button" onclick="copyPassword()">📋 Copy Password</button>
+            <button class="button" onclick="editEntry()">✏️ Edit</button>
+            <button class="button button-danger" onclick="deleteEntry()">🗑️ Delete</button>
+        </div>
+    </div>
+</div>
+
+<!-- Add/Edit Entry Modal -->
+<div id="edit-modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2 id="edit-modal-title">Add Entry</h2>
+            <span class="close" onclick="closeModal('edit-modal')">&times;</span>
+        </div>
+        <form id="entry-form">
+            <input type="hidden" id="entry-id">
+            
+            <label for="entry-title">Title *</label>
+            <input type="text" id="entry-title" required>
+            
+            <label for="entry-username">Username/Email</label>
+            <input type="text" id="entry-username">
+            
+            <label for="entry-password">Password *</label>
+            <div class="password-field">
+                <input type="password" id="entry-password" required>
+                <span class="password-toggle" onclick="togglePassword('entry-password')">👁️</span>
+            </div>
+            <button type="button" class="button button-small" onclick="generatePasswordForForm()">Generate</button>
+            
+            <label for="entry-url">URL</label>
+            <input type="url" id="entry-url">
+            
+            <label for="entry-category">Category</label>
+            <input type="text" id="entry-category" value="general">
+            
+            <label for="entry-notes">Notes</label>
+            <textarea id="entry-notes" rows="3"></textarea>
+            
+            <div class="button-group">
+                <button type="submit" class="button">💾 Save</button>
+                <button type="button" class="button" onclick="closeModal('edit-modal')">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let entries = [];
+    let currentEntry = null;
+    
+    // Load entries on page load
+    document.addEventListener('DOMContentLoaded', () => {
+        loadEntries();
+        
+        // Search functionality
+        document.getElementById('search-input').addEventListener('input', (e) => {
+            const query = e.target.value.toLowerCase();
+            displayEntries(entries.filter(entry => 
+                entry.title.toLowerCase().includes(query) ||
+                (entry.username && entry.username.toLowerCase().includes(query)) ||
+                (entry.category && entry.category.toLowerCase().includes(query))
+            ));
+        });
+    });
+    
+    async function loadEntries() {
+        try {
+            const response = await fetch('/api/entries');
+            if (response.ok) {
+                entries = await response.json();
+                displayEntries(entries);
+            } else {
+                window.location.href = '/';
+            }
+        } catch (error) {
+            console.error('Error loading entries:', error);
+        }
+    }
+    
+    function displayEntries(entriesToShow) {
+        const container = document.getElementById('entries-container');
+        
+        if (entriesToShow.length === 0) {
+            container.innerHTML = '<div class="empty-state"><h2>No entries found</h2><p>Click "Add Entry" to create your first password entry</p></div>';
+            return;
+        }
+        
+        container.innerHTML = entriesToShow.map(entry => `
+            <div class="entry-card" onclick="viewEntry('${entry.id}')">
+                <div class="entry-header">
+                    <div>
+                        <div class="entry-title">${escapeHtml(entry.title)}
+                            ${entry.category ? `<span class="category-badge">${escapeHtml(entry.category)}</span>` : ''}
+                        </div>
+                        <div class="entry-meta">
+                            ${entry.username ? escapeHtml(entry.username) : 'No username'}
+                        </div>
+                    </div>
+                </div>
+                ${entry.url ? `<div class="entry-meta">🔗 ${escapeHtml(entry.url)}</div>` : ''}
+            </div>
+        `).join('');
+    }
+    
+    async function viewEntry(entryId) {
+        try {
+            const response = await fetch(`/api/entries/${entryId}`);
+            if (response.ok) {
+                currentEntry = await response.json();
+                document.getElementById('view-title').textContent = currentEntry.title;
+                document.getElementById('view-details').innerHTML = `
+                    <p><strong>Username:</strong> ${currentEntry.username || 'N/A'}</p>
+                    <p><strong>Password:</strong> ${'*'.repeat(currentEntry.password.length)}</p>
+                    <p><strong>URL:</strong> ${currentEntry.url ? `<a href="${currentEntry.url}" target="_blank">${currentEntry.url}</a>` : 'N/A'}</p>
+                    <p><strong>Category:</strong> ${currentEntry.category || 'N/A'}</p>
+                    <p><strong>Notes:</strong> ${currentEntry.notes || 'N/A'}</p>
+                `;
+                document.getElementById('view-modal').style.display = 'block';
+            }
+        } catch (error) {
+            alert('Error loading entry');
+        }
+    }
+    
+    function showAddModal() {
+        currentEntry = null;
+        document.getElementById('edit-modal-title').textContent = 'Add Entry';
+        document.getElementById('entry-form').reset();
+        document.getElementById('entry-id').value = '';
+        document.getElementById('edit-modal').style.display = 'block';
+    }
+    
+    function editEntry() {
+        if (!currentEntry) return;
+        
+        document.getElementById('edit-modal-title').textContent = 'Edit Entry';
+        document.getElementById('entry-id').value = currentEntry.id;
+        document.getElementById('entry-title').value = currentEntry.title;
+        document.getElementById('entry-username').value = currentEntry.username || '';
+        document.getElementById('entry-password').value = currentEntry.password;
+        document.getElementById('entry-url').value = currentEntry.url || '';
+        document.getElementById('entry-category').value = currentEntry.category || 'general';
+        document.getElementById('entry-notes').value = currentEntry.notes || '';
+        
+        closeModal('view-modal');
+        document.getElementById('edit-modal').style.display = 'block';
+    }
+    
+    document.getElementById('entry-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const entryId = document.getElementById('entry-id').value;
+        const data = {
+            title: document.getElementById('entry-title').value,
+            username: document.getElementById('entry-username').value,
+            password: document.getElementById('entry-password').value,
+            url: document.getElementById('entry-url').value,
+            category: document.getElementById('entry-category').value,
+            notes: document.getElementById('entry-notes').value
+        };
+        
+        try {
+            const url = entryId ? `/api/entries/${entryId}` : '/api/entries';
+            const method = entryId ? 'PUT' : 'POST';
+            
+            const response = await fetch(url, {
+                method: method,
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            });
+            
+            if (response.ok) {
+                closeModal('edit-modal');
+                loadEntries();
+            } else {
+                alert('Error saving entry');
+            }
+        } catch (error) {
+            alert('Error saving entry');
+        }
+    });
+    
+    async function deleteEntry() {
+        if (!currentEntry) return;
+        
+        if (confirm(`Delete "${currentEntry.title}"?`)) {
+            try {
+                const response = await fetch(`/api/entries/${currentEntry.id}`, {
+                    method: 'DELETE'
+                });
+                
+                if (response.ok) {
+                    closeModal('view-modal');
+                    loadEntries();
+                }
+            } catch (error) {
+                alert('Error deleting entry');
+            }
+        }
+    }
+    
+    function copyPassword() {
+        if (!currentEntry) return;
+        
+        navigator.clipboard.writeText(currentEntry.password).then(() => {
+            alert('Password copied to clipboard (will clear in 30 seconds)');
+            setTimeout(() => {
+                navigator.clipboard.writeText('');
+            }, 30000);
+        });
+    }
+    
+    async function generatePassword() {
+        try {
+            const response = await fetch('/api/generate-password', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({length: 16, use_symbols: true})
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                alert(`Generated password: ${data.password}\nStrength: ${data.strength.label}`);
+                navigator.clipboard.writeText(data.password);
+            }
+        } catch (error) {
+            alert('Error generating password');
+        }
+    }
+    
+    async function generatePasswordForForm() {
+        try {
+            const response = await fetch('/api/generate-password', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({length: 16, use_symbols: true})
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                document.getElementById('entry-password').value = data.password;
+            }
+        } catch (error) {
+            alert('Error generating password');
+        }
+    }
+    
+    function togglePassword(fieldId) {
+        const field = document.getElementById(fieldId);
+        field.type = field.type === 'password' ? 'text' : 'password';
+    }
+    
+    function closeModal(modalId) {
+        document.getElementById(modalId).style.display = 'none';
+    }
+    
+    async function logout() {
+        try {
+            await fetch('/api/auth/logout', {method: 'POST'});
+            window.location.href = '/';
+        } catch (error) {
+            window.location.href = '/';
+        }
+    }
+    
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+    
+    // Close modal when clicking outside
+    window.onclick = function(event) {
+        if (event.target.classList.contains('modal')) {
+            event.target.style.display = 'none';
+        }
+    }
+</script>
+{% endblock %}
