@@ -24,7 +24,6 @@ class AppContext:
         self.session: SessionManager = None
         self.totp: TOTPManager = None
         self.authenticated = False
-        self.master_password = None
 
 ctx = AppContext()
 
@@ -131,7 +130,7 @@ def unlock(storage_path, auto_lock):
         
         try:
             ctx.storage.initialize(master_password)
-            ctx.master_password = master_password
+            # Don't store master password - it's no longer needed after initialization
         except ValueError as e:
             console.print(f"[red]Failed to unlock vault: {e}[/red]")
             sys.exit(1)
@@ -439,16 +438,61 @@ def destroy(storage_path, force):
 
 
 def _check_authenticated():
-    """Check if user is authenticated"""
+    """Check if user is authenticated, prompt for authentication if not"""
     if not ctx.authenticated or ctx.storage is None:
-        console.print("[red]Please unlock the vault first: passw0rts unlock[/red]")
-        return False
+        # Auto-authenticate
+        if not _auto_authenticate():
+            return False
     
-    if ctx.session.is_locked:
-        console.print("[red]Session locked. Please unlock again.[/red]")
-        return False
+    if ctx.session and ctx.session.is_locked:
+        console.print("[red]Session locked. Re-authenticating...[/red]")
+        if not _auto_authenticate():
+            return False
     
     return True
+
+
+def _auto_authenticate(storage_path=None):
+    """Automatically authenticate by prompting for master password"""
+    try:
+        ctx.storage = StorageManager(storage_path)
+        
+        if not ctx.storage.storage_path.exists():
+            console.print("[red]Vault not found. Run 'passw0rts init' first.[/red]")
+            return False
+        
+        # Get master password
+        master_password = Prompt.ask("[bold]Master password[/bold]", password=True)
+        
+        try:
+            ctx.storage.initialize(master_password)
+            # Don't store master password - it's no longer needed after initialization
+        except ValueError as e:
+            console.print(f"[red]Failed to unlock vault: {e}[/red]")
+            return False
+        
+        # Check for TOTP
+        config_dir = ctx.storage.storage_path.parent
+        config_file = config_dir / "config.totp"
+        
+        if config_file.exists():
+            secret = config_file.read_text().strip()
+            ctx.totp = TOTPManager(secret)
+            
+            totp_code = Prompt.ask("[bold]TOTP code[/bold]")
+            if not ctx.totp.verify_code(totp_code):
+                console.print("[red]Invalid TOTP code![/red]")
+                return False
+        
+        ctx.authenticated = True
+        ctx.session = SessionManager(timeout_seconds=300)
+        ctx.session.unlock()
+        
+        return True
+        
+    except Exception as e:
+        console.print(f"[red]Authentication error: {e}[/red]")
+        return False
 
 
 def _find_entry_by_id(entry_id: str):
