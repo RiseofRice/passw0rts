@@ -4,7 +4,6 @@ Integration tests for storage manager
 
 import pytest
 import tempfile
-import json
 from pathlib import Path
 from passw0rts.core import StorageManager, PasswordEntry
 
