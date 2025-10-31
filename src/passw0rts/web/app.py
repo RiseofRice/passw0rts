@@ -34,7 +34,8 @@ def create_app(storage_path=None, secret_key=None):
     # Enable CORS for localhost
     CORS(app)
     
-    # Global storage manager
+    # Global storage manager (Note: For production use with concurrent requests,
+    # consider using Flask's application context or session-based storage)
     storage_manager = None
     totp_manager = None
     
@@ -91,7 +92,8 @@ def create_app(storage_path=None, secret_key=None):
             })
             
         except Exception as e:
-            return jsonify({'error': str(e)}), 401
+            # Don't expose internal error details to users
+            return jsonify({'error': 'Authentication failed'}), 401
     
     @app.route('/api/auth/logout', methods=['POST'])
     def logout():
@@ -169,7 +171,8 @@ def create_app(storage_path=None, secret_key=None):
             return jsonify({'id': entry_id, 'success': True})
             
         except Exception as e:
-            return jsonify({'error': str(e)}), 400
+            # Don't expose internal error details to users
+            return jsonify({'error': 'Failed to create entry'}), 400
     
     @app.route('/api/entries/<entry_id>', methods=['PUT'])
     def update_entry(entry_id):

@@ -149,7 +149,12 @@ class EncryptionManager:
     def clear(self):
         """Clear sensitive data from memory"""
         if self._key:
-            # Overwrite key in memory before deleting
-            self._key = bytes(len(self._key))
+            # Note: Python's memory management makes true secure wiping difficult
+            # This is a best-effort approach
+            key_len = len(self._key)
+            self._key = None  # Release reference
+            # Force garbage collection (not guaranteed to be immediate)
+            import gc
+            gc.collect()
         self._key = None
         self._salt = None

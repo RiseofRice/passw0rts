@@ -28,7 +28,7 @@ setup(
     },
     author="RiseofRice",
     description="A secure cross-platform password manager with CLI and web UI",
-    long_description=open("README.md").read(),
+    long_description=open("README.md", encoding="utf-8").read(),
     long_description_content_type="text/markdown",
     url="https://github.com/RiseofRice/passw0rts",
     classifiers=[

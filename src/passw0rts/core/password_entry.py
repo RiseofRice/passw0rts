@@ -2,10 +2,15 @@
 Password entry data model
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, Dict, Any
 from pydantic import BaseModel, Field, ConfigDict
 import uuid
+
+
+def utc_now():
+    """Get current UTC time in a timezone-aware manner"""
+    return datetime.now(timezone.utc)
 
 
 class PasswordEntry(BaseModel):
@@ -27,8 +32,8 @@ class PasswordEntry(BaseModel):
     notes: Optional[str] = Field(None, description="Additional notes")
     category: Optional[str] = Field("general", description="Category for organization")
     tags: list[str] = Field(default_factory=list, description="Tags for search")
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for serialization"""
@@ -68,4 +73,4 @@ class PasswordEntry(BaseModel):
     
     def update_timestamp(self):
         """Update the updated_at timestamp"""
-        self.updated_at = datetime.utcnow()
+        self.updated_at = utc_now()

@@ -77,8 +77,8 @@ class SessionManager:
                     self.lock()
                     break
             
-            # Check every second
-            self._stop_event.wait(1)
+            # Check every 10 seconds (sufficient for auto-lock precision)
+            self._stop_event.wait(10)
     
     def stop(self):
         """Stop the session monitor"""

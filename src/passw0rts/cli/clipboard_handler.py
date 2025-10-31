@@ -21,16 +21,18 @@ class ClipboardHandler:
         """
         try:
             pyperclip.copy(text)
-        except Exception:
+        except Exception as e:
             # Fallback for systems without clipboard support
-            pass
+            import sys
+            print(f"Warning: Clipboard operation failed: {e}", file=sys.stderr)
     
     @staticmethod
     def clear():
         """Clear the clipboard"""
         try:
             pyperclip.copy("")
-        except Exception:
+        except Exception as e:
+            # Silent failure is acceptable for clipboard clearing
             pass
     
     @staticmethod
@@ -59,5 +61,7 @@ class ClipboardHandler:
         """
         try:
             return pyperclip.paste()
-        except Exception:
+        except Exception as e:
+            import sys
+            print(f"Warning: Clipboard paste failed: {e}", file=sys.stderr)
             return ""
