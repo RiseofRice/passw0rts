@@ -4,12 +4,16 @@ Flask web application for passw0rts password manager
 
 import os
 import secrets
-from flask import Flask, render_template, request, jsonify, session
+import logging
+from flask import Flask, render_template, request, jsonify, session, g
 from flask_cors import CORS
 from datetime import timedelta
 
 from passw0rts.core import StorageManager, PasswordEntry
 from passw0rts.utils import PasswordGenerator, TOTPManager
+
+# Configure logging
+logger = logging.getLogger(__name__)
 
 
 def create_app(storage_path=None, secret_key=None):
@@ -34,10 +38,40 @@ def create_app(storage_path=None, secret_key=None):
     # Enable CORS for localhost
     CORS(app)
     
-    # Global storage manager (Note: For production use with concurrent requests,
-    # consider using Flask's application context or session-based storage)
-    storage_manager = None
-    totp_manager = None
+    # Dictionary to store storage managers per session
+    # Key: session ID, Value: (StorageManager, TOTPManager)
+    _session_storage = {}
+    
+    def get_storage_manager():
+        """Get the storage manager for the current session."""
+        session_id = session.get('session_id')
+        if session_id and session_id in _session_storage:
+            return _session_storage[session_id][0]
+        return None
+    
+    def get_totp_manager():
+        """Get the TOTP manager for the current session."""
+        session_id = session.get('session_id')
+        if session_id and session_id in _session_storage:
+            return _session_storage[session_id][1]
+        return None
+    
+    def set_session_managers(storage_mgr, totp_mgr=None):
+        """Set the storage and TOTP managers for the current session."""
+        session_id = session.get('session_id')
+        if not session_id:
+            session_id = secrets.token_hex(16)
+            session['session_id'] = session_id
+        _session_storage[session_id] = (storage_mgr, totp_mgr)
+    
+    def clear_session_managers():
+        """Clear the managers for the current session."""
+        session_id = session.get('session_id')
+        if session_id and session_id in _session_storage:
+            storage_mgr, _ = _session_storage[session_id]
+            if storage_mgr:
+                storage_mgr.clear()
+            del _session_storage[session_id]
     
     @app.route('/')
     def index():
@@ -49,7 +83,6 @@ def create_app(storage_path=None, secret_key=None):
     @app.route('/api/auth/login', methods=['POST'])
     def login():
         """Authenticate and unlock vault"""
-        nonlocal storage_manager, totp_manager
         
         data = request.json
         master_password = data.get('master_password')
@@ -59,7 +92,7 @@ def create_app(storage_path=None, secret_key=None):
             return jsonify({'error': 'Master password required'}), 400
         
         try:
-            # Initialize storage
+            # Initialize storage for this session
             storage_manager = StorageManager(app.config['STORAGE_PATH'])
             
             if not storage_manager.storage_path.exists():
@@ -69,6 +102,7 @@ def create_app(storage_path=None, secret_key=None):
             storage_manager.initialize(master_password)
             
             # Check TOTP if enabled
+            totp_manager = None
             config_dir = storage_manager.storage_path.parent
             config_file = config_dir / "config.totp"
             
@@ -82,6 +116,9 @@ def create_app(storage_path=None, secret_key=None):
                 if not totp_manager.verify_code(totp_code):
                     return jsonify({'error': 'Invalid TOTP code'}), 401
             
+            # Store managers for this session
+            set_session_managers(storage_manager, totp_manager)
+            
             # Set session
             session['authenticated'] = True
             session.permanent = True
@@ -92,19 +129,16 @@ def create_app(storage_path=None, secret_key=None):
             })
             
         except Exception as e:
+            # Log the actual error for debugging and security monitoring
+            logger.error(f"Authentication failed: {str(e)}", exc_info=True)
             # Don't expose internal error details to users
             return jsonify({'error': 'Authentication failed'}), 401
     
     @app.route('/api/auth/logout', methods=['POST'])
     def logout():
         """Logout and lock vault"""
-        nonlocal storage_manager
-        
+        clear_session_managers()
         session.clear()
-        if storage_manager:
-            storage_manager.clear()
-            storage_manager = None
-        
         return jsonify({'success': True})
     
     @app.route('/api/entries', methods=['GET'])
@@ -112,6 +146,10 @@ def create_app(storage_path=None, secret_key=None):
         """Get all password entries"""
         if 'authenticated' not in session:
             return jsonify({'error': 'Not authenticated'}), 401
+        
+        storage_manager = get_storage_manager()
+        if not storage_manager:
+            return jsonify({'error': 'Session expired'}), 401
         
         query = request.args.get('q')
         
@@ -142,6 +180,10 @@ def create_app(storage_path=None, secret_key=None):
         if 'authenticated' not in session:
             return jsonify({'error': 'Not authenticated'}), 401
         
+        storage_manager = get_storage_manager()
+        if not storage_manager:
+            return jsonify({'error': 'Session expired'}), 401
+        
         entry = storage_manager.get_entry(entry_id)
         if not entry:
             return jsonify({'error': 'Entry not found'}), 404
@@ -153,6 +195,10 @@ def create_app(storage_path=None, secret_key=None):
         """Create a new password entry"""
         if 'authenticated' not in session:
             return jsonify({'error': 'Not authenticated'}), 401
+        
+        storage_manager = get_storage_manager()
+        if not storage_manager:
+            return jsonify({'error': 'Session expired'}), 401
         
         data = request.json
         
@@ -171,6 +217,8 @@ def create_app(storage_path=None, secret_key=None):
             return jsonify({'id': entry_id, 'success': True})
             
         except Exception as e:
+            # Log the actual error for debugging
+            logger.error(f"Failed to create entry: {str(e)}", exc_info=True)
             # Don't expose internal error details to users
             return jsonify({'error': 'Failed to create entry'}), 400
     
@@ -179,6 +227,10 @@ def create_app(storage_path=None, secret_key=None):
         """Update an existing entry"""
         if 'authenticated' not in session:
             return jsonify({'error': 'Not authenticated'}), 401
+        
+        storage_manager = get_storage_manager()
+        if not storage_manager:
+            return jsonify({'error': 'Session expired'}), 401
         
         entry = storage_manager.get_entry(entry_id)
         if not entry:
@@ -210,6 +262,10 @@ def create_app(storage_path=None, secret_key=None):
         """Delete an entry"""
         if 'authenticated' not in session:
             return jsonify({'error': 'Not authenticated'}), 401
+        
+        storage_manager = get_storage_manager()
+        if not storage_manager:
+            return jsonify({'error': 'Session expired'}), 401
         
         if storage_manager.delete_entry(entry_id):
             return jsonify({'success': True})
