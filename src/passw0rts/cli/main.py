@@ -84,14 +84,26 @@ def init(storage_path, auto_lock):
             secret = totp.get_secret()
             
             console.print(f"\n[bold green]TOTP Secret:[/bold green] {secret}")
-            console.print("\nScan this with your authenticator app or save the secret:")
-            console.print(f"[dim]{totp.get_provisioning_uri('passw0rts')}[/dim]")
+            console.print("\n[bold]Scan this QR code with your authenticator app:[/bold]")
+            
+            # Display QR code in terminal
+            try:
+                import qrcode
+                qr = qrcode.QRCode()
+                qr.add_data(totp.get_provisioning_uri('passw0rts'))
+                qr.make()
+                console.print()
+                qr.print_ascii(invert=True)
+                console.print()
+            except Exception as e:
+                console.print(f"[yellow]Could not display QR code: {e}[/yellow]")
+                console.print(f"[dim]Manual setup URI: {totp.get_provisioning_uri('passw0rts')}[/dim]")
             
             # Save TOTP secret to a config file
             config_dir = storage.storage_path.parent
             config_file = config_dir / "config.totp"
             config_file.write_text(secret)
-            console.print(f"\n[green]✓[/green] TOTP secret saved to {config_file}")
+            console.print(f"[green]✓[/green] TOTP secret saved to {config_file}")
         
         console.print(f"\n[bold green]✓ Vault initialized successfully![/bold green]")
         console.print(f"Storage: {storage.storage_path}")
@@ -372,6 +384,55 @@ def web(host, port, storage_path):
         
     except KeyboardInterrupt:
         console.print("\n[yellow]Server stopped[/yellow]")
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+        sys.exit(1)
+
+
+@main.command()
+@click.option('--storage-path', type=click.Path(), help='Custom storage path')
+@click.option('--force', is_flag=True, help='Skip confirmation prompt')
+def destroy(storage_path, force):
+    """Permanently delete the password vault"""
+    try:
+        storage = StorageManager(storage_path)
+        
+        if not storage.storage_path.exists():
+            console.print("[yellow]Vault not found. Nothing to delete.[/yellow]")
+            return
+        
+        console.print(Panel.fit(
+            "[bold red]⚠️  WARNING ⚠️[/bold red]\n\n"
+            "This will permanently delete your password vault and all stored passwords.\n"
+            "[bold]This action cannot be undone![/bold]",
+            title="🗑️  Destroy Vault"
+        ))
+        
+        console.print(f"\n[bold]Vault location:[/bold] {storage.storage_path}")
+        
+        # Confirm deletion
+        if not force:
+            confirm_text = Prompt.ask(
+                "\n[bold red]Type 'DELETE' to confirm destruction[/bold red]"
+            )
+            if confirm_text != "DELETE":
+                console.print("[yellow]Destruction cancelled.[/yellow]")
+                return
+        
+        # Delete vault file
+        storage.storage_path.unlink()
+        console.print(f"[green]✓[/green] Vault file deleted: {storage.storage_path}")
+        
+        # Delete TOTP config if it exists
+        config_dir = storage.storage_path.parent
+        config_file = config_dir / "config.totp"
+        if config_file.exists():
+            config_file.unlink()
+            console.print(f"[green]✓[/green] TOTP config deleted: {config_file}")
+        
+        console.print("\n[bold green]✓ Vault destroyed successfully![/bold green]")
+        console.print("[dim]Run 'passw0rts init' to create a new vault.[/dim]")
+        
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]")
         sys.exit(1)
