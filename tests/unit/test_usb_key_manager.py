@@ -84,6 +84,44 @@ class TestUSBDevice:
         assert "TestKey" in device_str
         assert "1234" in device_str
         assert "5678" in device_str
+    
+    def test_device_validation_vendor_id(self):
+        """Test vendor ID validation"""
+        # Invalid vendor IDs
+        with pytest.raises(ValueError, match="Invalid vendor_id"):
+            USBDevice(vendor_id=-1, product_id=0x1234, serial_number="ABC123")
+        
+        with pytest.raises(ValueError, match="Invalid vendor_id"):
+            USBDevice(vendor_id=0x10000, product_id=0x1234, serial_number="ABC123")
+        
+        # Valid vendor IDs
+        USBDevice(vendor_id=0x0000, product_id=0x1234, serial_number="ABC123")
+        USBDevice(vendor_id=0xFFFF, product_id=0x1234, serial_number="ABC123")
+    
+    def test_device_validation_product_id(self):
+        """Test product ID validation"""
+        # Invalid product IDs
+        with pytest.raises(ValueError, match="Invalid product_id"):
+            USBDevice(vendor_id=0x1234, product_id=-1, serial_number="ABC123")
+        
+        with pytest.raises(ValueError, match="Invalid product_id"):
+            USBDevice(vendor_id=0x1234, product_id=0x10000, serial_number="ABC123")
+        
+        # Valid product IDs
+        USBDevice(vendor_id=0x1234, product_id=0x0000, serial_number="ABC123")
+        USBDevice(vendor_id=0x1234, product_id=0xFFFF, serial_number="ABC123")
+    
+    def test_device_validation_serial_number(self):
+        """Test serial number validation"""
+        # Invalid serial numbers
+        with pytest.raises(ValueError, match="Serial number cannot be empty"):
+            USBDevice(vendor_id=0x1234, product_id=0x5678, serial_number="")
+        
+        with pytest.raises(ValueError, match="Serial number cannot be empty"):
+            USBDevice(vendor_id=0x1234, product_id=0x5678, serial_number="   ")
+        
+        # Valid serial number
+        USBDevice(vendor_id=0x1234, product_id=0x5678, serial_number="ABC123")
 
 
 class TestUSBKeyManager:

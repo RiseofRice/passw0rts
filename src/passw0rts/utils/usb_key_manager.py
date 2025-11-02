@@ -17,6 +17,14 @@ class USBDevice:
     """Represents a USB device"""
     
     def __init__(self, vendor_id: int, product_id: int, serial_number: str, manufacturer: str = "", product: str = ""):
+        # Validate USB identifiers
+        if not (0x0000 <= vendor_id <= 0xFFFF):
+            raise ValueError(f"Invalid vendor_id: {vendor_id}. Must be 0x0000-0xFFFF")
+        if not (0x0000 <= product_id <= 0xFFFF):
+            raise ValueError(f"Invalid product_id: {product_id}. Must be 0x0000-0xFFFF")
+        if not serial_number or not serial_number.strip():
+            raise ValueError("Serial number cannot be empty")
+        
         self.vendor_id = vendor_id
         self.product_id = product_id
         self.serial_number = serial_number
@@ -103,8 +111,9 @@ class USBKeyManager:
             if 'response_hash' in data:
                 self._response_hash = data['response_hash']
                 
-        except Exception as e:
-            # If config is corrupted, ignore it
+        except (FileNotFoundError, json.JSONDecodeError, KeyError, ValueError) as e:
+            # If config is missing or corrupted, start fresh
+            # In production, this could be logged for debugging
             pass
     
     def _save_config(self):
@@ -178,8 +187,9 @@ class USBKeyManager:
                     )
                     devices.append(device)
                     
-                except (ValueError, usb.core.USBError):
-                    # Skip devices we can't access
+                except (ValueError, Exception) as e:
+                    # Skip devices we can't access (permissions, etc.)
+                    # Using Exception to catch usb.core.USBError and other USB-related errors
                     continue
                     
         except ImportError:
@@ -206,7 +216,8 @@ class USBKeyManager:
         self._challenge = secrets.token_bytes(32)
         
         # Derive a response from master password + device info + challenge
-        device_id = f"{device.vendor_id:04x}{device.product_id:04x}{device.serial_number}"
+        # Use delimiters to prevent device ID collision
+        device_id = f"{device.vendor_id:04x}:{device.product_id:04x}:{device.serial_number}"
         response_data = f"{master_password}:{device_id}:{self._challenge.hex()}"
         
         # Hash the response for verification
@@ -264,7 +275,8 @@ class USBKeyManager:
             return False
         
         # Derive response from master password + device info + challenge
-        device_id = f"{self._registered_device.vendor_id:04x}{self._registered_device.product_id:04x}{self._registered_device.serial_number}"
+        # Use delimiters to prevent device ID collision
+        device_id = f"{self._registered_device.vendor_id:04x}:{self._registered_device.product_id:04x}:{self._registered_device.serial_number}"
         response_data = f"{master_password}:{device_id}:{self._challenge.hex()}"
         
         # Verify response hash
@@ -289,7 +301,8 @@ class USBKeyManager:
         
         # Derive a key from device info + challenge
         # This allows unlocking without password when USB key is present
-        device_id = f"{self._registered_device.vendor_id:04x}{self._registered_device.product_id:04x}{self._registered_device.serial_number}"
+        # Use delimiters to prevent device ID collision
+        device_id = f"{self._registered_device.vendor_id:04x}:{self._registered_device.product_id:04x}:{self._registered_device.serial_number}"
         key_material = f"usbkey:{device_id}:{self._challenge.hex()}"
         
         # Return a deterministic key derived from device

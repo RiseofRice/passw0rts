@@ -171,8 +171,8 @@ def unlock(storage_path, auto_lock):
         if usb_key_connected:
             console.print("[green]🔑 USB security key detected![/green]")
             
-            # Offer USB-only authentication
-            use_usb_only = Confirm.ask("[bold]Unlock with USB key only (skip password/TOTP)?[/bold]", default=True)
+            # Offer USB-only authentication (default=False for security)
+            use_usb_only = Confirm.ask("[bold]Unlock with USB key only (skip password/TOTP)?[/bold]", default=False)
             
             if use_usb_only:
                 # Authenticate with USB key only
@@ -731,8 +731,8 @@ def _auto_authenticate(storage_path=None):
         if usb_key_connected:
             console.print("[green]🔑 USB security key detected![/green]")
             
-            # Offer USB-only authentication
-            use_usb_only = Confirm.ask("[bold]Unlock with USB key only (skip password/TOTP)?[/bold]", default=True)
+            # Offer USB-only authentication (default=False for security)
+            use_usb_only = Confirm.ask("[bold]Unlock with USB key only (skip password/TOTP)?[/bold]", default=False)
             
             if use_usb_only:
                 # Authenticate with USB key only
