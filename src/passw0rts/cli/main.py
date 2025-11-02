@@ -11,7 +11,7 @@ from rich.panel import Panel
 from rich.prompt import Prompt, Confirm
 
 from passw0rts.core import StorageManager, PasswordEntry
-from passw0rts.utils import PasswordGenerator, TOTPManager, SessionPersistence
+from passw0rts.utils import PasswordGenerator, TOTPManager, SessionPersistence, USBKeyManager, USBDevice
 from passw0rts.utils.session_manager import SessionManager
 from .clipboard_handler import ClipboardHandler
 
@@ -104,6 +104,36 @@ def init(storage_path, auto_lock):
             config_file.write_text(secret)
             console.print(f"[green]✓[/green] TOTP secret saved to {config_file}")
         
+        # Set up USB security key (optional)
+        if Confirm.ask("\n[bold]Register a USB security key (YubiKey or other)?[/bold]", default=False):
+            config_dir = storage.storage_path.parent
+            usb_manager = USBKeyManager(str(config_dir / "config.usbkey"))
+            
+            console.print("\n[cyan]Detecting USB devices...[/cyan]")
+            devices = usb_manager.list_available_devices()
+            
+            if not devices:
+                console.print("[yellow]No USB devices detected. Make sure your USB key is plugged in.[/yellow]")
+            else:
+                console.print(f"\n[bold]Found {len(devices)} USB device(s):[/bold]")
+                
+                for i, device in enumerate(devices, 1):
+                    console.print(f"  {i}. {device}")
+                
+                choice = Prompt.ask(f"\n[bold]Select device (1-{len(devices)})[/bold]", default="1")
+                
+                try:
+                    device_idx = int(choice) - 1
+                    if 0 <= device_idx < len(devices):
+                        selected_device = devices[device_idx]
+                        usb_manager.register_device(selected_device, master_password)
+                        console.print(f"\n[green]✓[/green] USB key registered: {selected_device}")
+                        console.print("[dim]Note: With USB key registered, master password and TOTP become optional when the key is connected.[/dim]")
+                    else:
+                        console.print("[yellow]Invalid selection. USB key not registered.[/yellow]")
+                except ValueError:
+                    console.print("[yellow]Invalid input. USB key not registered.[/yellow]")
+        
         console.print(f"\n[bold green]✓ Vault initialized successfully![/bold green]")
         console.print(f"Storage: {storage.storage_path}")
         console.print(f"Auto-lock: {auto_lock} seconds")
@@ -128,31 +158,66 @@ def unlock(storage_path, auto_lock):
         # Initialize session persistence
         session_persist = SessionPersistence()
         
-        # Get master password
-        master_password = Prompt.ask("[bold]Master password[/bold]", password=True)
-        
-        try:
-            ctx.storage.initialize(master_password)
-        except ValueError as e:
-            console.print(f"[red]Failed to unlock vault: {e}[/red]")
-            sys.exit(1)
-        
-        # Check for TOTP
+        # Check for USB key
         config_dir = ctx.storage.storage_path.parent
+        usb_key_file = config_dir / "config.usbkey"
+        usb_manager = USBKeyManager(str(usb_key_file))
+        has_usb_key = usb_manager.is_device_registered()
+        usb_key_connected = has_usb_key and usb_manager.is_registered_device_connected()
+        
+        master_password = None
+        
+        # USB Key Authentication Flow
+        if usb_key_connected:
+            console.print("[green]🔑 USB security key detected![/green]")
+            
+            # Offer USB-only authentication (default=False for security)
+            use_usb_only = Confirm.ask("[bold]Unlock with USB key only (skip password/TOTP)?[/bold]", default=False)
+            
+            if use_usb_only:
+                # Authenticate with USB key only
+                derived_key = usb_manager.authenticate_with_device_only()
+                
+                if derived_key:
+                    try:
+                        ctx.storage.initialize(derived_key)
+                        master_password = derived_key
+                        console.print("[green]✓ Authenticated with USB key[/green]")
+                    except ValueError:
+                        console.print("[yellow]USB key authentication failed. Falling back to password authentication.[/yellow]")
+        
+        # Get master password if not authenticated via USB
+        if master_password is None:
+            master_password = Prompt.ask("[bold]Master password[/bold]" + (" (optional with USB key)" if usb_key_connected else ""), password=True)
+            
+            try:
+                ctx.storage.initialize(master_password)
+            except ValueError as e:
+                console.print(f"[red]Failed to unlock vault: {e}[/red]")
+                sys.exit(1)
+        
+        # Check for TOTP (optional if USB key is connected)
         config_file = config_dir / "config.totp"
         totp_verified_at = None
         
         if config_file.exists():
-            secret = config_file.read_text().strip()
-            ctx.totp = TOTPManager(secret)
+            # If USB key is connected and verified, make TOTP optional
+            skip_totp = False
+            if usb_key_connected and usb_manager.verify_device_authentication(master_password):
+                console.print("[green]✓ USB key verified. TOTP not required.[/green]")
+                skip_totp = True
             
-            totp_code = Prompt.ask("[bold]TOTP code[/bold]")
-            if not ctx.totp.verify_code(totp_code):
-                console.print("[red]Invalid TOTP code![/red]")
-                sys.exit(1)
-            
-            import time
-            totp_verified_at = time.time()
+            if not skip_totp:
+                secret = config_file.read_text().strip()
+                ctx.totp = TOTPManager(secret)
+                
+                totp_code = Prompt.ask("[bold]TOTP code[/bold]")
+                if not ctx.totp.verify_code(totp_code):
+                    console.print("[red]Invalid TOTP code![/red]")
+                    sys.exit(1)
+                
+                import time
+                totp_verified_at = time.time()
         
         ctx.authenticated = True
         ctx.session = SessionManager(timeout_seconds=auto_lock)
@@ -445,6 +510,12 @@ def destroy(storage_path, force):
             config_file.unlink()
             console.print(f"[green]✓[/green] TOTP config deleted: {config_file}")
         
+        # Delete USB key config if it exists
+        usb_key_file = config_dir / "config.usbkey"
+        if usb_key_file.exists():
+            usb_key_file.unlink()
+            console.print(f"[green]✓[/green] USB key config deleted: {usb_key_file}")
+        
         # Clear session
         session_persist = SessionPersistence()
         if session_persist.session_exists():
@@ -471,6 +542,147 @@ def lock():
             console.print("[dim]You will need to re-authenticate on the next command.[/dim]")
         else:
             console.print("[yellow]No active session found.[/yellow]")
+        
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+        sys.exit(1)
+
+
+@main.command(name='add-key')
+@click.option('--storage-path', type=click.Path(), help='Custom storage path')
+def add_key(storage_path):
+    """Register a USB security key to an existing vault"""
+    try:
+        # Verify vault exists
+        storage = StorageManager(storage_path)
+        
+        if not storage.storage_path.exists():
+            console.print("[red]Vault not found. Run 'passw0rts init' first.[/red]")
+            sys.exit(1)
+        
+        console.print(Panel.fit(
+            "[bold cyan]Register USB Security Key[/bold cyan]\n\n"
+            "This will register a USB security key (YubiKey or other) to your vault.\n"
+            "Once registered, you can unlock the vault using only the USB key.",
+            title="🔑 USB Key Registration"
+        ))
+        
+        # Authenticate first
+        master_password = Prompt.ask("\n[bold]Master password[/bold]", password=True)
+        
+        try:
+            storage.initialize(master_password)
+        except ValueError as e:
+            console.print(f"[red]Failed to unlock vault: {e}[/red]")
+            sys.exit(1)
+        
+        # Check for TOTP
+        config_dir = storage.storage_path.parent
+        config_file = config_dir / "config.totp"
+        if config_file.exists():
+            secret = config_file.read_text().strip()
+            totp = TOTPManager(secret)
+            
+            totp_code = Prompt.ask("[bold]TOTP code[/bold]")
+            if not totp.verify_code(totp_code):
+                console.print("[red]Invalid TOTP code![/red]")
+                sys.exit(1)
+        
+        # Set up USB key
+        usb_manager = USBKeyManager(str(config_dir / "config.usbkey"))
+        
+        # Check if key already registered
+        if usb_manager.is_device_registered():
+            current_device = usb_manager.get_registered_device()
+            console.print(f"\n[yellow]A USB key is already registered:[/yellow]")
+            console.print(f"  {current_device}")
+            
+            if not Confirm.ask("\n[bold]Replace with a new key?[/bold]"):
+                console.print("[yellow]Operation cancelled.[/yellow]")
+                return
+        
+        console.print("\n[cyan]Detecting USB devices...[/cyan]")
+        devices = usb_manager.list_available_devices()
+        
+        if not devices:
+            console.print("[yellow]No USB devices detected. Make sure your USB key is plugged in.[/yellow]")
+            sys.exit(1)
+        
+        console.print(f"\n[bold]Found {len(devices)} USB device(s):[/bold]")
+        
+        for i, device in enumerate(devices, 1):
+            console.print(f"  {i}. {device}")
+        
+        choice = Prompt.ask(f"\n[bold]Select device (1-{len(devices)})[/bold]", default="1")
+        
+        try:
+            device_idx = int(choice) - 1
+            if 0 <= device_idx < len(devices):
+                selected_device = devices[device_idx]
+                usb_manager.register_device(selected_device, master_password)
+                console.print(f"\n[bold green]✓ USB key registered successfully![/bold green]")
+                console.print(f"Device: {selected_device}")
+                console.print("\n[dim]Note: With USB key registered, master password and TOTP become optional when the key is connected.[/dim]")
+            else:
+                console.print("[red]Invalid selection.[/red]")
+                sys.exit(1)
+        except ValueError:
+            console.print("[red]Invalid input.[/red]")
+            sys.exit(1)
+        
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+        sys.exit(1)
+
+
+@main.command(name='remove-key')
+@click.option('--storage-path', type=click.Path(), help='Custom storage path')
+def remove_key(storage_path):
+    """Remove registered USB security key"""
+    try:
+        # Verify vault exists
+        storage = StorageManager(storage_path)
+        
+        if not storage.storage_path.exists():
+            console.print("[red]Vault not found. Run 'passw0rts init' first.[/red]")
+            sys.exit(1)
+        
+        config_dir = storage.storage_path.parent
+        usb_manager = USBKeyManager(str(config_dir / "config.usbkey"))
+        
+        if not usb_manager.is_device_registered():
+            console.print("[yellow]No USB key is currently registered.[/yellow]")
+            return
+        
+        current_device = usb_manager.get_registered_device()
+        console.print(f"\n[bold]Currently registered USB key:[/bold]")
+        console.print(f"  {current_device}")
+        
+        # Authenticate first
+        master_password = Prompt.ask("\n[bold]Master password[/bold]", password=True)
+        
+        try:
+            storage.initialize(master_password)
+        except ValueError as e:
+            console.print(f"[red]Failed to unlock vault: {e}[/red]")
+            sys.exit(1)
+        
+        # Check for TOTP
+        config_file = config_dir / "config.totp"
+        if config_file.exists():
+            secret = config_file.read_text().strip()
+            totp = TOTPManager(secret)
+            
+            totp_code = Prompt.ask("[bold]TOTP code[/bold]")
+            if not totp.verify_code(totp_code):
+                console.print("[red]Invalid TOTP code![/red]")
+                sys.exit(1)
+        
+        if Confirm.ask("\n[bold red]Remove this USB key?[/bold red]"):
+            usb_manager.unregister_device()
+            console.print("[bold green]✓ USB key removed successfully![/bold green]")
+        else:
+            console.print("[yellow]Operation cancelled.[/yellow]")
         
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]")
@@ -504,20 +716,60 @@ def _auto_authenticate(storage_path=None):
         # Initialize session persistence
         session_persist = SessionPersistence()
         
-        # Check for TOTP config
+        # Check for configs
         config_dir = ctx.storage.storage_path.parent
         config_file = config_dir / "config.totp"
         has_totp = config_file.exists()
         
+        # Check for USB key
+        usb_key_file = config_dir / "config.usbkey"
+        usb_manager = USBKeyManager(str(usb_key_file))
+        has_usb_key = usb_manager.is_device_registered()
+        usb_key_connected = has_usb_key and usb_manager.is_registered_device_connected()
+        
+        # USB Key Authentication Flow: If USB key is connected, make password/TOTP optional
+        if usb_key_connected:
+            console.print("[green]🔑 USB security key detected![/green]")
+            
+            # Offer USB-only authentication (default=False for security)
+            use_usb_only = Confirm.ask("[bold]Unlock with USB key only (skip password/TOTP)?[/bold]", default=False)
+            
+            if use_usb_only:
+                # Authenticate with USB key only
+                derived_key = usb_manager.authenticate_with_device_only()
+                
+                if derived_key:
+                    try:
+                        # Use derived key as master password
+                        ctx.storage.initialize(derived_key)
+                        
+                        ctx.authenticated = True
+                        ctx.session = SessionManager(timeout_seconds=300)
+                        ctx.session.unlock()
+                        
+                        console.print("[green]✓ Authenticated with USB key[/green]")
+                        return True
+                    except ValueError:
+                        console.print("[yellow]USB key authentication failed. Falling back to password authentication.[/yellow]")
+                else:
+                    console.print("[yellow]Could not authenticate with USB key. Falling back to password authentication.[/yellow]")
+        
+        # Standard authentication flow (with or without USB key verification)
         # Try to load existing session
         if session_persist.session_exists():
             # Prompt for master password to unlock session
-            master_password = Prompt.ask("[bold]Master password[/bold]", password=True)
+            master_password = Prompt.ask("[bold]Master password[/bold]" + (" (optional with USB key)" if usb_key_connected else ""), password=True)
             session_data = session_persist.load_session(master_password)
             
             if session_data:
                 # Session is valid, check if we need TOTP
                 needs_totp = has_totp and not session_persist.is_totp_valid(session_data)
+                
+                # If USB key is connected and registered with this password, skip TOTP
+                if usb_key_connected and needs_totp:
+                    if usb_manager.verify_device_authentication(master_password):
+                        console.print("[green]✓ USB key verified. TOTP not required.[/green]")
+                        needs_totp = False
                 
                 # Initialize storage with master password
                 try:
@@ -560,7 +812,7 @@ def _auto_authenticate(storage_path=None):
                 return True
         
         # No valid session, do full authentication
-        master_password = Prompt.ask("[bold]Master password[/bold]", password=True)
+        master_password = Prompt.ask("[bold]Master password[/bold]" + (" (optional with USB key)" if usb_key_connected else ""), password=True)
         
         try:
             ctx.storage.initialize(master_password)
@@ -568,19 +820,27 @@ def _auto_authenticate(storage_path=None):
             console.print(f"[red]Failed to unlock vault: {e}[/red]")
             return False
         
-        # Check for TOTP
+        # Check for TOTP (optional if USB key is connected)
         totp_verified_at = None
         if has_totp:
-            secret = config_file.read_text().strip()
-            ctx.totp = TOTPManager(secret)
+            # If USB key is connected and verified, make TOTP optional
+            skip_totp = False
+            if usb_key_connected:
+                if usb_manager.verify_device_authentication(master_password):
+                    console.print("[green]✓ USB key verified. TOTP not required.[/green]")
+                    skip_totp = True
             
-            totp_code = Prompt.ask("[bold]TOTP code[/bold]")
-            if not ctx.totp.verify_code(totp_code):
-                console.print("[red]Invalid TOTP code![/red]")
-                return False
-            
-            import time
-            totp_verified_at = time.time()
+            if not skip_totp:
+                secret = config_file.read_text().strip()
+                ctx.totp = TOTPManager(secret)
+                
+                totp_code = Prompt.ask("[bold]TOTP code[/bold]")
+                if not ctx.totp.verify_code(totp_code):
+                    console.print("[red]Invalid TOTP code![/red]")
+                    return False
+                
+                import time
+                totp_verified_at = time.time()
         
         ctx.authenticated = True
         ctx.session = SessionManager(timeout_seconds=300)
