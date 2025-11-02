@@ -7,6 +7,7 @@ A secure, cross-platform password manager with CLI and web UI capabilities. Buil
 ### Security
 - **AES-256-GCM Encryption**: Military-grade encryption for your passwords
 - **PBKDF2 Key Derivation**: 600,000 iterations (OWASP recommended)
+- **USB Security Key Support**: Hardware-based authentication with YubiKey and other USB keys
 - **TOTP 2FA**: Optional two-factor authentication support
 - **Auto-lock**: Automatic session locking after inactivity
 - **Clipboard Timeout**: Passwords automatically cleared from clipboard
@@ -50,7 +51,8 @@ pip install -e ".[dev]"
 # Initialize a new password vault
 passw0rts init
 
-# You'll be prompted for a master password and TOTP setup (optional)
+# You'll be prompted for a master password, TOTP setup (optional), 
+# and USB security key registration (optional)
 ```
 
 ### CLI Usage
@@ -82,6 +84,10 @@ passw0rts export --output backup.json
 
 # Import from JSON
 passw0rts import backup.json
+
+# USB Security Key Management
+passw0rts add-key      # Register USB key to existing vault
+passw0rts remove-key   # Remove registered USB key
 ```
 
 ### Web UI
@@ -145,6 +151,58 @@ passw0rts/
 - Auto-lock after configurable timeout (default: 5 minutes)
 - Clipboard automatically cleared after 30 seconds
 - TOTP 2FA for additional security layer
+- USB security key support for hardware-based authentication
+
+### USB Security Key Authentication
+Passw0rts supports hardware-based authentication using USB security keys (including YubiKey, Nitrokey, and other USB devices).
+
+**Features:**
+- **Device Registration**: Register any USB device as a security key during vault initialization or later
+- **Password-Optional Unlock**: When USB key is connected, unlock vault without entering master password or TOTP
+- **Challenge-Response**: Uses device-specific identification (Vendor ID, Product ID, Serial Number) combined with cryptographic challenge-response
+- **Fallback Authentication**: Master password and TOTP remain available if USB key is not connected
+- **Multi-Factor Simplification**: USB key presence can replace both master password and TOTP when connected
+
+**Setup:**
+
+During vault initialization:
+```bash
+passw0rts init
+# Follow prompts and select "Yes" for USB security key registration
+```
+
+Add to existing vault:
+```bash
+passw0rts add-key
+# Enter master password and TOTP (if enabled)
+# Select your USB device from the list
+```
+
+**Usage:**
+
+When USB key is connected:
+```bash
+passw0rts unlock
+# Option to unlock with USB key only (skip password/TOTP)
+```
+
+When USB key is not connected:
+```bash
+passw0rts unlock
+# Falls back to standard authentication (master password + TOTP)
+```
+
+Remove USB key:
+```bash
+passw0rts remove-key
+```
+
+**Security Notes:**
+- USB key detection uses device hardware identifiers (VID/PID/Serial)
+- A cryptographic challenge-response mechanism ties the USB key to your master password
+- USB key does not store your passwords or master password
+- Physical possession of the registered USB device is required for keyless unlock
+- Compatible with any USB device that has a unique serial number (not limited to security-specific devices)
 
 ## Configuration
 
@@ -209,9 +267,10 @@ pytest tests/unit/test_encryption.py -v
 ### Best Practices
 1. **Strong Master Password**: Use a long, unique master password
 2. **Enable TOTP**: Add extra security layer with 2FA
-3. **Regular Backups**: Export and securely store backups
-4. **Keep Updated**: Stay on latest version for security patches
-5. **Secure Storage**: Keep vault file in secure location
+3. **Register USB Security Key**: Use hardware-based authentication for enhanced security
+4. **Regular Backups**: Export and securely store backups
+5. **Keep Updated**: Stay on latest version for security patches
+6. **Secure Storage**: Keep vault file in secure location
 
 ### Threat Model
 - Protects against: Offline attacks, data breaches, unauthorized access
@@ -225,6 +284,9 @@ pytest tests/unit/test_encryption.py -v
 
 ## Roadmap
 
+Completed features:
+- [x] Hardware key support (YubiKey and other USB security keys)
+
 Future enhancements may include:
 - [ ] Cloud sync support
 - [ ] Breach database checking (HaveIBeenPwned integration)
@@ -232,7 +294,6 @@ Future enhancements may include:
 - [ ] Mobile apps
 - [ ] Password sharing
 - [ ] Biometric unlock
-- [ ] Hardware key support (YubiKey)
 
 ## Contributing
 
