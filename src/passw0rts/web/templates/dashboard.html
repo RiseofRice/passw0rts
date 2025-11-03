@@ -325,6 +325,25 @@
         background-color: var(--accent-light);
     }
     
+    .density-option-description {
+        font-size: calc(var(--font-size-base) * 0.85);
+        color: var(--text-secondary);
+    }
+    
+    .entry-list-title {
+        font-size: calc(var(--font-size-base) * 1.1);
+    }
+    
+    .entry-list-meta {
+        text-align: right;
+        white-space: nowrap;
+    }
+    
+    .entry-card-meta {
+        margin-top: calc(var(--spacing-base) * 0.4);
+        font-size: calc(var(--font-size-base) * 0.85);
+    }
+    
     .slider-container {
         margin-top: calc(var(--spacing-base) * 0.5);
     }
@@ -416,15 +435,15 @@
         <div class="density-options">
             <div class="density-option" data-density="compact" onclick="selectDensity('compact')">
                 <strong>Compact</strong>
-                <div style="font-size: 0.85em; color: var(--text-secondary);">More content</div>
+                <div class="density-option-description">More content</div>
             </div>
             <div class="density-option active" data-density="comfortable" onclick="selectDensity('comfortable')">
                 <strong>Comfortable</strong>
-                <div style="font-size: 0.85em; color: var(--text-secondary);">Balanced</div>
+                <div class="density-option-description">Balanced</div>
             </div>
             <div class="density-option" data-density="spacious" onclick="selectDensity('spacious')">
                 <strong>Spacious</strong>
-                <div style="font-size: 0.85em; color: var(--text-secondary);">More space</div>
+                <div class="density-option-description">More space</div>
             </div>
         </div>
     </div>
@@ -628,7 +647,7 @@
                         </div>
                     </div>
                     ${entry.url ? `<div class="entry-meta">🔗 ${escapeHtml(entry.url)}</div>` : ''}
-                    <div class="entry-meta" style="margin-top: 8px; font-size: 0.85em;">
+                    <div class="entry-meta entry-card-meta">
                         🕒 Updated ${formatDate(entry.updated_at)}
                     </div>
                 </div>
@@ -637,7 +656,7 @@
             container.innerHTML = entriesToShow.map(entry => `
                 <div class="entry-list-item" onclick="viewEntry('${entry.id}')">
                     <div style="flex: 1;">
-                        <div class="entry-title" style="font-size: calc(var(--font-size-base) * 1.1);">${escapeHtml(entry.title)}
+                        <div class="entry-title entry-list-title">${escapeHtml(entry.title)}
                             ${entry.category ? `<span class="category-badge">${escapeHtml(entry.category)}</span>` : ''}
                         </div>
                         <div class="entry-meta">
@@ -645,7 +664,7 @@
                             ${entry.url ? ` | 🔗 ${escapeHtml(entry.url)}` : ''}
                         </div>
                     </div>
-                    <div class="entry-meta" style="text-align: right; white-space: nowrap;">
+                    <div class="entry-meta entry-list-meta">
                         🕒 ${formatDate(entry.updated_at)}
                     </div>
                 </div>
