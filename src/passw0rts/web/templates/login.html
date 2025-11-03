@@ -4,40 +4,114 @@
 
 {% block styles %}
 <style>
+    body {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+        background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
+    }
+    
     .login-container {
-        max-width: 400px;
-        margin: 100px auto;
-        padding: 40px;
-        background-color: var(--bg-secondary);
-        border-radius: 10px;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        max-width: 450px;
+        width: 100%;
+        margin: var(--spacing-base);
+        padding: calc(var(--spacing-base) * 2);
+        background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%);
+        border-radius: calc(var(--border-radius) * 2);
+        box-shadow: 0 20px 60px var(--shadow-hover);
+        border: 1px solid var(--border-color);
+        animation: slideDown 0.5s ease-out;
+    }
+    
+    @keyframes slideDown {
+        from {
+            opacity: 0;
+            transform: translateY(-30px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
     }
     
     .login-header {
         text-align: center;
-        margin-bottom: 30px;
+        margin-bottom: calc(var(--spacing-base) * 1.5);
     }
     
     .login-header h1 {
-        font-size: 32px;
-        margin-bottom: 10px;
+        font-size: calc(var(--font-size-base) * 2.3);
+        margin-bottom: calc(var(--spacing-base) * 0.5);
+        background: linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
     }
     
     .login-header p {
         color: var(--text-secondary);
+        font-size: calc(var(--font-size-base) * 1.1);
     }
     
     .error-message {
         background-color: var(--danger);
         color: white;
-        padding: 10px;
-        border-radius: 5px;
-        margin-bottom: 15px;
+        padding: calc(var(--spacing-base) * 0.75);
+        border-radius: var(--border-radius);
+        margin-bottom: calc(var(--spacing-base) * 0.75);
         display: none;
+        animation: shake 0.5s;
+    }
+    
+    @keyframes shake {
+        0%, 100% { transform: translateX(0); }
+        25% { transform: translateX(-10px); }
+        75% { transform: translateX(10px); }
     }
     
     .totp-field {
         display: none;
+        animation: slideDown 0.3s;
+    }
+    
+    .theme-selector {
+        text-align: center;
+        margin-top: calc(var(--spacing-base) * 1.5);
+        padding-top: calc(var(--spacing-base) * 1.5);
+        border-top: 1px solid var(--border-color);
+    }
+    
+    .theme-selector-label {
+        color: var(--text-secondary);
+        font-size: calc(var(--font-size-base) * 0.9);
+        margin-bottom: calc(var(--spacing-base) * 0.5);
+        display: block;
+    }
+    
+    .quick-theme-buttons {
+        display: flex;
+        gap: calc(var(--spacing-base) * 0.5);
+        justify-content: center;
+        flex-wrap: wrap;
+    }
+    
+    .quick-theme-btn {
+        padding: calc(var(--spacing-base) * 0.4) calc(var(--spacing-base) * 0.75);
+        border: 1px solid var(--border-color);
+        background-color: var(--bg-secondary);
+        color: var(--text-primary);
+        border-radius: var(--border-radius);
+        cursor: pointer;
+        transition: all var(--transition-speed);
+        font-size: calc(var(--font-size-base) * 0.9);
+    }
+    
+    .quick-theme-btn:hover {
+        border-color: var(--accent);
+        background-color: var(--accent);
+        color: white;
+        transform: translateY(-2px);
     }
 </style>
 {% endblock %}
@@ -57,14 +131,24 @@
         
         <div id="totp-field" class="totp-field">
             <label for="totp-code">TOTP Code</label>
-            <input type="text" id="totp-code" pattern="[0-9]{6}" maxlength="6">
+            <input type="text" id="totp-code" pattern="[0-9]{6}" maxlength="6" placeholder="Enter 6-digit code">
         </div>
         
-        <button type="submit" class="button" style="width: 100%;">Unlock Vault</button>
+        <button type="submit" class="button button-icon" style="width: 100%;">
+            🔓 Unlock Vault
+        </button>
     </form>
     
-    <div style="text-align: center; margin-top: 20px;">
-        <button class="theme-toggle button-small" onclick="toggleTheme()">Toggle Theme</button>
+    <div class="theme-selector">
+        <span class="theme-selector-label">Quick Theme Selection</span>
+        <div class="quick-theme-buttons">
+            <button type="button" class="quick-theme-btn" onclick="setLoginTheme('light')">☀️ Light</button>
+            <button type="button" class="quick-theme-btn" onclick="setLoginTheme('dark')">🌙 Dark</button>
+            <button type="button" class="quick-theme-btn" onclick="setLoginTheme('blue')">🌊 Blue</button>
+            <button type="button" class="quick-theme-btn" onclick="setLoginTheme('purple')">💜 Purple</button>
+            <button type="button" class="quick-theme-btn" onclick="setLoginTheme('green')">🌿 Green</button>
+            <button type="button" class="quick-theme-btn" onclick="setLoginTheme('nord')">❄️ Nord</button>
+        </div>
     </div>
 </div>
 {% endblock %}
@@ -79,11 +163,21 @@
     
     let totpRequired = false;
     
+    function setLoginTheme(theme) {
+        CustomizationManager.setTheme(theme);
+    }
+    
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
         
         const masterPassword = masterPasswordInput.value;
         const totpCode = totpInput.value;
+        
+        // Show loading state
+        const submitBtn = form.querySelector('button[type="submit"]');
+        const originalText = submitBtn.innerHTML;
+        submitBtn.innerHTML = '⏳ Unlocking...';
+        submitBtn.disabled = true;
         
         try {
             const response = await fetch('/api/auth/login', {
@@ -100,8 +194,14 @@
             const data = await response.json();
             
             if (response.ok) {
-                window.location.href = '/';
+                submitBtn.innerHTML = '✅ Success!';
+                setTimeout(() => {
+                    window.location.href = '/';
+                }, 500);
             } else {
+                submitBtn.innerHTML = originalText;
+                submitBtn.disabled = false;
+                
                 if (data.totp_required && !totpRequired) {
                     // Show TOTP field
                     totpRequired = true;
@@ -116,6 +216,8 @@
                 }
             }
         } catch (error) {
+            submitBtn.innerHTML = originalText;
+            submitBtn.disabled = false;
             errorDiv.textContent = 'Connection error';
             errorDiv.style.display = 'block';
         }
