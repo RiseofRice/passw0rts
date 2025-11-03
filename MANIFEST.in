@@ -9,6 +9,7 @@ include pytest.ini
 
 # Include all package data
 recursive-include src/passw0rts *.py
+recursive-include src/passw0rts/web/templates *.html
 
 # Exclude unnecessary files
 global-exclude __pycache__

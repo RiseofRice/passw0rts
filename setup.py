@@ -5,6 +5,10 @@ setup(
     version="0.1.0",
     packages=find_packages(where="src"),
     package_dir={"": "src"},
+    package_data={
+        "passw0rts": ["web/templates/*.html"],
+    },
+    include_package_data=True,
     install_requires=[
         "cryptography>=41.0.7",
         "pyotp>=2.9.0",

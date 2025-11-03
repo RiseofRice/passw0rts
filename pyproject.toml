@@ -69,9 +69,13 @@ passw0rts = "passw0rts.cli:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
+include-package-data = true
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+passw0rts = ["web/templates/*.html"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
