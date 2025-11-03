@@ -5,28 +5,176 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Passw0rts{% endblock %}</title>
     <style>
+        /* Theme definitions with customization support */
+        :root {
+            /* Default values - overridden by themes */
+            --font-size-base: 14px;
+            --spacing-base: 20px;
+            --border-radius: 8px;
+            --transition-speed: 0.3s;
+        }
+        
+        /* Light theme */
         :root[data-theme="light"] {
             --bg-primary: #ffffff;
             --bg-secondary: #f5f5f5;
+            --bg-tertiary: #e8e8e8;
             --text-primary: #333333;
             --text-secondary: #666666;
             --border-color: #dddddd;
             --accent: #4a90e2;
             --accent-hover: #357abd;
+            --accent-light: #e3f2fd;
             --danger: #e74c3c;
             --success: #27ae60;
+            --warning: #f39c12;
+            --shadow: rgba(0, 0, 0, 0.1);
+            --shadow-hover: rgba(0, 0, 0, 0.15);
         }
         
+        /* Dark theme */
         :root[data-theme="dark"] {
             --bg-primary: #1e1e1e;
             --bg-secondary: #2d2d2d;
+            --bg-tertiary: #3d3d3d;
             --text-primary: #e0e0e0;
             --text-secondary: #a0a0a0;
             --border-color: #3d3d3d;
             --accent: #5ca3e8;
             --accent-hover: #4a90e2;
+            --accent-light: #1a3a52;
             --danger: #e74c3c;
             --success: #2ecc71;
+            --warning: #f39c12;
+            --shadow: rgba(0, 0, 0, 0.3);
+            --shadow-hover: rgba(0, 0, 0, 0.5);
+        }
+        
+        /* Blue theme */
+        :root[data-theme="blue"] {
+            --bg-primary: #0d1b2a;
+            --bg-secondary: #1b263b;
+            --bg-tertiary: #415a77;
+            --text-primary: #e0e1dd;
+            --text-secondary: #778da9;
+            --border-color: #415a77;
+            --accent: #00b4d8;
+            --accent-hover: #0096c7;
+            --accent-light: #023e8a;
+            --danger: #e63946;
+            --success: #2a9d8f;
+            --warning: #f77f00;
+            --shadow: rgba(0, 0, 0, 0.4);
+            --shadow-hover: rgba(0, 0, 0, 0.6);
+        }
+        
+        /* Purple theme */
+        :root[data-theme="purple"] {
+            --bg-primary: #1a0933;
+            --bg-secondary: #2d1b4e;
+            --bg-tertiary: #432874;
+            --text-primary: #e9d5ff;
+            --text-secondary: #c4b5fd;
+            --border-color: #432874;
+            --accent: #a78bfa;
+            --accent-hover: #8b5cf6;
+            --accent-light: #4c1d95;
+            --danger: #f43f5e;
+            --success: #34d399;
+            --warning: #fbbf24;
+            --shadow: rgba(0, 0, 0, 0.4);
+            --shadow-hover: rgba(0, 0, 0, 0.6);
+        }
+        
+        /* Green theme */
+        :root[data-theme="green"] {
+            --bg-primary: #0a2e1c;
+            --bg-secondary: #1b4332;
+            --bg-tertiary: #2d6a4f;
+            --text-primary: #d8f3dc;
+            --text-secondary: #95d5b2;
+            --border-color: #2d6a4f;
+            --accent: #52b788;
+            --accent-hover: #40916c;
+            --accent-light: #1b4332;
+            --danger: #ef476f;
+            --success: #06ffa5;
+            --warning: #ffd166;
+            --shadow: rgba(0, 0, 0, 0.4);
+            --shadow-hover: rgba(0, 0, 0, 0.6);
+        }
+        
+        /* Nord theme */
+        :root[data-theme="nord"] {
+            --bg-primary: #2e3440;
+            --bg-secondary: #3b4252;
+            --bg-tertiary: #434c5e;
+            --text-primary: #eceff4;
+            --text-secondary: #d8dee9;
+            --border-color: #4c566a;
+            --accent: #88c0d0;
+            --accent-hover: #81a1c1;
+            --accent-light: #5e81ac;
+            --danger: #bf616a;
+            --success: #a3be8c;
+            --warning: #ebcb8b;
+            --shadow: rgba(0, 0, 0, 0.3);
+            --shadow-hover: rgba(0, 0, 0, 0.5);
+        }
+        
+        /* Solarized Dark theme */
+        :root[data-theme="solarized"] {
+            --bg-primary: #002b36;
+            --bg-secondary: #073642;
+            --bg-tertiary: #586e75;
+            --text-primary: #fdf6e3;
+            --text-secondary: #93a1a1;
+            --border-color: #586e75;
+            --accent: #268bd2;
+            --accent-hover: #2aa198;
+            --accent-light: #073642;
+            --danger: #dc322f;
+            --success: #859900;
+            --warning: #b58900;
+            --shadow: rgba(0, 0, 0, 0.3);
+            --shadow-hover: rgba(0, 0, 0, 0.5);
+        }
+        
+        /* Dracula theme */
+        :root[data-theme="dracula"] {
+            --bg-primary: #282a36;
+            --bg-secondary: #44475a;
+            --bg-tertiary: #6272a4;
+            --text-primary: #f8f8f2;
+            --text-secondary: #6272a4;
+            --border-color: #6272a4;
+            --accent: #bd93f9;
+            --accent-hover: #ff79c6;
+            --accent-light: #44475a;
+            --danger: #ff5555;
+            --success: #50fa7b;
+            --warning: #f1fa8c;
+            --shadow: rgba(0, 0, 0, 0.3);
+            --shadow-hover: rgba(0, 0, 0, 0.5);
+        }
+        
+        /* Density variations */
+        :root[data-density="compact"] {
+            --spacing-base: 12px;
+            --font-size-base: 13px;
+            --border-radius: 4px;
+        }
+        
+        :root[data-density="comfortable"] {
+            --spacing-base: 20px;
+            --font-size-base: 14px;
+            --border-radius: 8px;
+        }
+        
+        :root[data-density="spacious"] {
+            --spacing-base: 28px;
+            --font-size-base: 16px;
+            --border-radius: 12px;
         }
         
         * {
@@ -40,48 +188,62 @@
             background-color: var(--bg-primary);
             color: var(--text-primary);
             line-height: 1.6;
+            font-size: var(--font-size-base);
+            transition: background-color var(--transition-speed), color var(--transition-speed);
         }
         
         .container {
             max-width: 1200px;
             margin: 0 auto;
-            padding: 20px;
+            padding: var(--spacing-base);
         }
         
         header {
             background-color: var(--bg-secondary);
-            border-bottom: 1px solid var(--border-color);
-            padding: 20px 0;
-            margin-bottom: 30px;
+            border-bottom: 2px solid var(--border-color);
+            padding: var(--spacing-base) 0;
+            margin-bottom: calc(var(--spacing-base) * 1.5);
+            box-shadow: 0 2px 4px var(--shadow);
+            transition: all var(--transition-speed);
         }
         
         .header-content {
             max-width: 1200px;
             margin: 0 auto;
-            padding: 0 20px;
+            padding: 0 var(--spacing-base);
             display: flex;
             justify-content: space-between;
             align-items: center;
         }
         
         h1 {
-            font-size: 24px;
+            font-size: calc(var(--font-size-base) * 1.7);
             color: var(--accent);
+            font-weight: 600;
+            letter-spacing: -0.5px;
         }
         
         .button {
             background-color: var(--accent);
             color: white;
             border: none;
-            padding: 10px 20px;
-            border-radius: 5px;
+            padding: calc(var(--spacing-base) * 0.5) var(--spacing-base);
+            border-radius: var(--border-radius);
             cursor: pointer;
-            font-size: 14px;
-            transition: background-color 0.3s;
+            font-size: var(--font-size-base);
+            transition: all var(--transition-speed);
+            font-weight: 500;
+            box-shadow: 0 2px 4px var(--shadow);
         }
         
         .button:hover {
             background-color: var(--accent-hover);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px var(--shadow-hover);
+        }
+        
+        .button:active {
+            transform: translateY(0);
         }
         
         .button-danger {
@@ -93,40 +255,57 @@
         }
         
         .button-small {
-            padding: 5px 10px;
-            font-size: 12px;
+            padding: calc(var(--spacing-base) * 0.25) calc(var(--spacing-base) * 0.6);
+            font-size: calc(var(--font-size-base) * 0.9);
+        }
+        
+        .button-icon {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
         }
         
         input, textarea, select {
             width: 100%;
-            padding: 10px;
+            padding: calc(var(--spacing-base) * 0.6);
             background-color: var(--bg-secondary);
             color: var(--text-primary);
             border: 1px solid var(--border-color);
-            border-radius: 5px;
-            font-size: 14px;
-            margin-bottom: 15px;
+            border-radius: var(--border-radius);
+            font-size: var(--font-size-base);
+            margin-bottom: calc(var(--spacing-base) * 0.75);
+            transition: all var(--transition-speed);
         }
         
         input:focus, textarea:focus, select:focus {
             outline: none;
             border-color: var(--accent);
+            box-shadow: 0 0 0 3px var(--accent-light);
         }
         
         label {
             display: block;
-            margin-bottom: 5px;
+            margin-bottom: calc(var(--spacing-base) * 0.25);
             color: var(--text-secondary);
-            font-size: 14px;
+            font-size: var(--font-size-base);
+            font-weight: 500;
         }
         
         .theme-toggle {
             cursor: pointer;
-            padding: 8px 15px;
-            background-color: var(--bg-secondary);
+            padding: calc(var(--spacing-base) * 0.4) calc(var(--spacing-base) * 0.75);
+            background-color: var(--bg-tertiary);
             border: 1px solid var(--border-color);
-            border-radius: 5px;
+            border-radius: var(--border-radius);
             color: var(--text-primary);
+            transition: all var(--transition-speed);
+            font-weight: 500;
+        }
+        
+        .theme-toggle:hover {
+            background-color: var(--accent);
+            color: white;
+            transform: translateY(-1px);
         }
     </style>
     {% block styles %}{% endblock %}
@@ -135,18 +314,87 @@
     {% block body %}{% endblock %}
     
     <script>
-        // Theme toggle
-        function toggleTheme() {
-            const html = document.documentElement;
-            const currentTheme = html.getAttribute('data-theme');
-            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-            html.setAttribute('data-theme', newTheme);
-            localStorage.setItem('theme', newTheme);
-        }
+        // Customization system
+        const CustomizationManager = {
+            defaults: {
+                theme: 'dark',
+                density: 'comfortable',
+                fontSize: 14,
+                customColors: null
+            },
+            
+            init() {
+                this.loadSettings();
+                this.applySettings();
+            },
+            
+            loadSettings() {
+                const saved = localStorage.getItem('passw0rts_customization');
+                this.settings = saved ? JSON.parse(saved) : {...this.defaults};
+            },
+            
+            saveSettings() {
+                localStorage.setItem('passw0rts_customization', JSON.stringify(this.settings));
+            },
+            
+            applySettings() {
+                const html = document.documentElement;
+                html.setAttribute('data-theme', this.settings.theme);
+                html.setAttribute('data-density', this.settings.density);
+                
+                // Apply custom colors if set
+                if (this.settings.customColors) {
+                    Object.entries(this.settings.customColors).forEach(([key, value]) => {
+                        html.style.setProperty(`--${key}`, value);
+                    });
+                }
+                
+                // Apply font size
+                if (this.settings.fontSize !== this.defaults.fontSize) {
+                    html.style.setProperty('--font-size-base', `${this.settings.fontSize}px`);
+                }
+            },
+            
+            setTheme(theme) {
+                this.settings.theme = theme;
+                this.saveSettings();
+                this.applySettings();
+            },
+            
+            setDensity(density) {
+                this.settings.density = density;
+                this.saveSettings();
+                this.applySettings();
+            },
+            
+            setFontSize(size) {
+                this.settings.fontSize = size;
+                this.saveSettings();
+                this.applySettings();
+            },
+            
+            setCustomColors(colors) {
+                this.settings.customColors = colors;
+                this.saveSettings();
+                this.applySettings();
+            },
+            
+            resetToDefaults() {
+                this.settings = {...this.defaults};
+                this.saveSettings();
+                this.applySettings();
+            }
+        };
         
-        // Load saved theme
-        const savedTheme = localStorage.getItem('theme') || 'dark';
-        document.documentElement.setAttribute('data-theme', savedTheme);
+        // Initialize on load
+        CustomizationManager.init();
+        
+        // Legacy theme toggle function for backward compatibility
+        function toggleTheme() {
+            const currentTheme = CustomizationManager.settings.theme;
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            CustomizationManager.setTheme(newTheme);
+        }
     </script>
     
     {% block scripts %}{% endblock %}
