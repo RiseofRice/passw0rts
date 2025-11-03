@@ -1,5 +1,8 @@
 # 🔐 Passw0rts
 
+[![PyPI version](https://badge.fury.io/py/passw0rts.svg)](https://badge.fury.io/py/passw0rts)
+[![Python versions](https://img.shields.io/pypi/pyversions/passw0rts.svg)](https://pypi.org/project/passw0rts/)
+
 A secure, cross-platform password manager with CLI and web UI capabilities. Built with strong encryption (AES-256-GCM), TOTP 2FA support, and modern security practices.
 
 ## Features
@@ -24,6 +27,12 @@ A secure, cross-platform password manager with CLI and web UI capabilities. Buil
 - **Cross-Platform**: Works on macOS, Windows, and Linux
 
 ## Installation
+
+### From PyPI (Recommended)
+
+```bash
+pip install passw0rts
+```
 
 ### From Source
 
