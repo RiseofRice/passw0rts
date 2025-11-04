@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="passw0rts",
-    version="0.1.0",
+    version="0.1.5",
     packages=find_packages(where="src"),
     package_dir={"": "src"},
     package_data={
