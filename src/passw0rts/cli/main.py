@@ -370,6 +370,67 @@ def show(entry_id):
 
 @main.command()
 @click.argument('entry_id')
+def edit(entry_id):
+    """Edit an existing password entry"""
+    if not _check_authenticated():
+        return
+    
+    ctx.session.update_activity()
+    
+    entry = _find_entry_by_id(entry_id)
+    if not entry:
+        return
+    
+    console.print(Panel.fit(
+        f"[bold cyan]Edit Password Entry[/bold cyan]\n\n"
+        f"[dim]Press Enter to keep current value[/dim]",
+        title="✏️  Edit"
+    ))
+    
+    # Show current entry details
+    console.print(f"\n[bold]Current entry: {entry.title}[/bold]")
+    
+    # Collect new information (with defaults from current entry)
+    title = Prompt.ask("[bold]Title[/bold]", default=entry.title)
+    username = Prompt.ask("[bold]Username/Email[/bold]", default=entry.username or "")
+    
+    # Password options
+    if Confirm.ask("[bold]Change password?[/bold]", default=False):
+        if Confirm.ask("[bold]Generate new password?[/bold]", default=True):
+            length = int(Prompt.ask("Length", default="16"))
+            use_symbols = Confirm.ask("Include symbols?", default=True)
+            password = PasswordGenerator.generate(length=length, use_symbols=use_symbols)
+            console.print(f"\n[bold green]Generated:[/bold green] {password}")
+            label, score = PasswordGenerator.estimate_strength(password)
+            console.print(f"Strength: [bold]{label}[/bold] ({score}/100)\n")
+        else:
+            password = Prompt.ask("[bold]New password[/bold]", password=True)
+    else:
+        password = entry.password
+    
+    url = Prompt.ask("[bold]URL[/bold]", default=entry.url or "")
+    category = Prompt.ask("[bold]Category[/bold]", default=entry.category or "general")
+    notes = Prompt.ask("[bold]Notes[/bold]", default=entry.notes or "")
+    
+    # Create updated entry
+    # Note: updated_at will be automatically set by storage.update_entry()
+    updated_entry = PasswordEntry(
+        id=entry.id,  # Keep the same ID
+        title=title,
+        username=username or None,
+        password=password,
+        url=url or None,
+        category=category,
+        notes=notes or None,
+        created_at=entry.created_at  # Preserve creation time
+    )
+    
+    ctx.storage.update_entry(entry.id, updated_entry)
+    console.print(f"\n[bold green]✓ Entry updated successfully![/bold green]")
+
+
+@main.command()
+@click.argument('entry_id')
 def delete(entry_id):
     """Delete a password entry"""
     if not _check_authenticated():
