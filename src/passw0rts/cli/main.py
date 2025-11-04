@@ -413,6 +413,7 @@ def edit(entry_id):
     notes = Prompt.ask("[bold]Notes[/bold]", default=entry.notes or "")
     
     # Create updated entry
+    # Note: updated_at will be automatically set by storage.update_entry()
     updated_entry = PasswordEntry(
         id=entry.id,  # Keep the same ID
         title=title,
@@ -421,8 +422,7 @@ def edit(entry_id):
         url=url or None,
         category=category,
         notes=notes or None,
-        created_at=entry.created_at,  # Preserve creation time
-        updated_at=entry.updated_at  # Will be updated by update_entry
+        created_at=entry.created_at  # Preserve creation time
     )
     
     ctx.storage.update_entry(entry.id, updated_entry)
