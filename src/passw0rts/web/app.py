@@ -330,10 +330,11 @@ def create_app(storage_path=None, secret_key=None):
                 totp_manager = TOTPManager()
                 totp_secret = totp_manager.get_secret()
 
-                # Save TOTP secret
+                # Save TOTP secret with secure permissions
                 config_dir = storage_manager.storage_path.parent
                 config_file = config_dir / "config.totp"
                 config_file.write_text(totp_secret)
+                config_file.chmod(0o600)  # Restrict to owner only
 
             return jsonify({
                 'success': True,
@@ -382,10 +383,11 @@ def create_app(storage_path=None, secret_key=None):
             totp_manager = TOTPManager()
             secret = totp_manager.get_secret()
 
-            # Save TOTP secret
+            # Save TOTP secret with secure permissions
             config_dir = storage_manager.storage_path.parent
             config_file = config_dir / "config.totp"
             config_file.write_text(secret)
+            config_file.chmod(0o600)  # Restrict to owner only
 
             return jsonify({
                 'success': True,
@@ -414,6 +416,28 @@ def create_app(storage_path=None, secret_key=None):
                 config_file.unlink()
 
             return jsonify({'success': True})
+
+        except Exception as e:
+            logger.error(f"Failed to remove TOTP: {str(e)}", exc_info=True)
+            return jsonify({'error': 'Failed to remove TOTP'}), 500
+
+    @app.route('/api/vault/totp/status', methods=['GET'])
+    def totp_status():
+        """Check TOTP configuration status"""
+        if 'authenticated' not in session:
+            return jsonify({'error': 'Not authenticated'}), 401
+
+        storage_manager = get_storage_manager()
+        if not storage_manager:
+            return jsonify({'error': 'Session expired'}), 401
+
+        try:
+            config_dir = storage_manager.storage_path.parent
+            config_file = config_dir / "config.totp"
+
+            return jsonify({
+                'enabled': config_file.exists()
+            })
 
         except Exception as e:
             logger.error(f"Failed to remove TOTP: {str(e)}", exc_info=True)

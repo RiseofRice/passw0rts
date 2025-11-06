@@ -893,18 +893,24 @@
     // Security settings functions
     async function checkSecurityStatus() {
         // Check TOTP status
-        const totpConfigExists = await fetch('/api/vault/status')
-            .then(r => r.json())
-            .then(data => {
-                // Assume TOTP exists if vault exists (we'll check more carefully later)
-                return data.exists;
-            });
-        
-        // For now, we'll check by trying to access the config
-        // This is a simplified check - in production, you'd have a dedicated endpoint
-        document.getElementById('totp-status').textContent = '❓ Unknown';
-        document.getElementById('setup-totp-btn').style.display = 'block';
-        document.getElementById('remove-totp-btn').style.display = 'none';
+        try {
+            const totpResponse = await fetch('/api/vault/totp/status');
+            const totpData = await totpResponse.json();
+            
+            if (totpData.enabled) {
+                document.getElementById('totp-status').textContent = '✅ Enabled';
+                document.getElementById('setup-totp-btn').style.display = 'none';
+                document.getElementById('remove-totp-btn').style.display = 'block';
+            } else {
+                document.getElementById('totp-status').textContent = '❌ Disabled';
+                document.getElementById('setup-totp-btn').style.display = 'block';
+                document.getElementById('remove-totp-btn').style.display = 'none';
+            }
+        } catch (error) {
+            document.getElementById('totp-status').textContent = '❓ Unknown';
+            document.getElementById('setup-totp-btn').style.display = 'block';
+            document.getElementById('remove-totp-btn').style.display = 'none';
+        }
         
         // Check USB key status
         try {

@@ -135,6 +135,25 @@ class TestWebAPITOTP:
         assert 'secret' in data
         assert len(data['secret']) > 0
 
+    def test_totp_status_disabled(self):
+        """Test TOTP status when not enabled"""
+        response = self.client.get('/api/vault/totp/status')
+
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data['enabled'] is False
+
+    def test_totp_status_enabled(self):
+        """Test TOTP status when enabled"""
+        # Setup TOTP first
+        self.client.post('/api/vault/totp/setup')
+
+        response = self.client.get('/api/vault/totp/status')
+
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data['enabled'] is True
+
     def test_get_totp_qrcode(self):
         """Test TOTP QR code generation"""
         response = self.client.post('/api/vault/totp/qrcode', json={
