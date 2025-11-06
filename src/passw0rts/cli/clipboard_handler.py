@@ -31,7 +31,7 @@ class ClipboardHandler:
         """Clear the clipboard"""
         try:
             pyperclip.copy("")
-        except Exception as e:
+        except Exception:
             # Silent failure is acceptable for clipboard clearing
             pass
     

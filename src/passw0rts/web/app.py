@@ -2,10 +2,9 @@
 Flask web application for passw0rts password manager
 """
 
-import os
 import secrets
 import logging
-from flask import Flask, render_template, request, jsonify, session, g
+from flask import Flask, render_template, request, jsonify, session
 from flask_cors import CORS
 from datetime import timedelta
 

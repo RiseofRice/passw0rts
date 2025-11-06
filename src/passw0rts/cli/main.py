@@ -11,11 +11,12 @@ from rich.panel import Panel
 from rich.prompt import Prompt, Confirm
 
 from passw0rts.core import StorageManager, PasswordEntry
-from passw0rts.utils import PasswordGenerator, TOTPManager, SessionPersistence, USBKeyManager, USBDevice
+from passw0rts.utils import PasswordGenerator, TOTPManager, SessionPersistence, USBKeyManager
 from passw0rts.utils.session_manager import SessionManager
 from .clipboard_handler import ClipboardHandler
 
 console = Console()
+
 
 # Global context for the session
 class AppContext:
@@ -24,6 +25,7 @@ class AppContext:
         self.session: SessionManager = None
         self.totp: TOTPManager = None
         self.authenticated = False
+
 
 ctx = AppContext()
 
@@ -146,7 +148,7 @@ def init(storage_path, auto_lock):
                 except ValueError:
                     console.print("[yellow]Invalid input. USB key not registered.[/yellow]")
         
-        console.print(f"\n[bold green]✓ Vault initialized successfully![/bold green]")
+        console.print("\n[bold green]✓ Vault initialized successfully![/bold green]")
         console.print(f"Storage: {storage.storage_path}")
         console.print(f"Auto-lock: {auto_lock} seconds")
         
@@ -246,7 +248,7 @@ def unlock(storage_path, auto_lock):
         console.print("[bold green]✓ Vault unlocked successfully![/bold green]")
         console.print(f"Entries: {len(ctx.storage.list_entries())}")
         console.print(f"Auto-lock: {auto_lock} seconds")
-        console.print(f"Session saved: Commands will not require re-authentication until lock\n")
+        console.print("Session saved: Commands will not require re-authentication until lock\n")
         
         # Show help
         console.print("[dim]Use 'passw0rts list' to see all entries[/dim]")
@@ -299,7 +301,7 @@ def add():
     )
     
     entry_id = ctx.storage.add_entry(entry)
-    console.print(f"\n[bold green]✓ Entry added successfully![/bold green]")
+    console.print("\n[bold green]✓ Entry added successfully![/bold green]")
     console.print(f"ID: {entry_id}")
 
 
@@ -394,8 +396,8 @@ def edit(entry_id):
         return
     
     console.print(Panel.fit(
-        f"[bold cyan]Edit Password Entry[/bold cyan]\n\n"
-        f"[dim]Press Enter to keep current value[/dim]",
+        "[bold cyan]Edit Password Entry[/bold cyan]\n\n"
+        "[dim]Press Enter to keep current value[/dim]",
         title="✏️  Edit"
     ))
     
@@ -438,7 +440,7 @@ def edit(entry_id):
     )
     
     ctx.storage.update_entry(entry.id, updated_entry)
-    console.print(f"\n[bold green]✓ Entry updated successfully![/bold green]")
+    console.print("\n[bold green]✓ Entry updated successfully![/bold green]")
 
 
 @main.command()
@@ -511,7 +513,7 @@ def import_entries(input_file):
     data = Path(input_file).read_text()
     ctx.storage.import_data(data)
     
-    console.print(f"[green]✓ Entries imported successfully[/green]")
+    console.print("[green]✓ Entries imported successfully[/green]")
     console.print(f"Total entries: {len(ctx.storage.list_entries())}")
 
 
@@ -525,10 +527,10 @@ def web(host, port, storage_path):
         from passw0rts.web import create_app
         
         console.print(Panel.fit(
-            f"[bold cyan]Starting Passw0rts Web UI[/bold cyan]\n\n"
+            "[bold cyan]Starting Passw0rts Web UI[/bold cyan]\n\n"
             f"[bold]URL:[/bold] http://{host}:{port}\n"
             f"[bold]Storage:[/bold] {storage_path or 'default (~/.passw0rts/vault.enc)'}\n\n"
-            f"[dim]Press Ctrl+C to stop the server[/dim]",
+            "[dim]Press Ctrl+C to stop the server[/dim]",
             title="🌐 Web Server"
         ))
         
@@ -561,17 +563,17 @@ def daemon_start(host, port, storage_path):
             return
         
         console.print(Panel.fit(
-            f"[bold cyan]Starting Passw0rts Web Daemon[/bold cyan]\n\n"
+            "[bold cyan]Starting Passw0rts Web Daemon[/bold cyan]\n\n"
             f"[bold]URL:[/bold] http://{host}:{port}\n"
             f"[bold]Storage:[/bold] {storage_path or 'default (~/.passw0rts/vault.enc)'}\n\n"
-            f"[dim]Use 'passw0rts daemon-stop' to stop the server[/dim]\n"
-            f"[dim]Use 'passw0rts daemon-logs' to view logs[/dim]",
+            "[dim]Use 'passw0rts daemon-stop' to stop the server[/dim]\n"
+            "[dim]Use 'passw0rts daemon-logs' to view logs[/dim]",
             title="🚀 Daemon"
         ))
         
         pid = daemon.start(host=host, port=port, storage_path=storage_path)
         
-        console.print(f"\n[bold green]✓ Daemon started successfully![/bold green]")
+        console.print("\n[bold green]✓ Daemon started successfully![/bold green]")
         console.print(f"PID: {pid}")
         console.print(f"Log file: {daemon.log_file}")
         
@@ -619,7 +621,7 @@ def daemon_restart(host, port, storage_path):
         
         pid = daemon.restart(host=host, port=port, storage_path=storage_path)
         
-        console.print(f"\n[bold green]✓ Daemon restarted successfully![/bold green]")
+        console.print("\n[bold green]✓ Daemon restarted successfully![/bold green]")
         console.print(f"PID: {pid}")
         console.print(f"Access at: http://{host}:{port}")
         
@@ -639,10 +641,10 @@ def daemon_status():
         if daemon.is_running():
             pid = daemon.get_pid()
             console.print(Panel.fit(
-                f"[bold green]✓ Daemon is running[/bold green]\n\n"
+                "[bold green]✓ Daemon is running[/bold green]\n\n"
                 f"[bold]PID:[/bold] {pid}\n"
                 f"[bold]Log file:[/bold] {daemon.log_file}\n\n"
-                f"[dim]Use 'passw0rts daemon-logs' to view logs[/dim]",
+                "[dim]Use 'passw0rts daemon-logs' to view logs[/dim]",
                 title="📊 Status"
             ))
         else:
@@ -691,11 +693,11 @@ def service_install(host, port, storage_path, no_start):
         daemon = DaemonManager()
         
         console.print(Panel.fit(
-            f"[bold cyan]Installing System Service[/bold cyan]\n\n"
+            "[bold cyan]Installing System Service[/bold cyan]\n\n"
             f"[bold]Platform:[/bold] {platform.system()}\n"
             f"[bold]URL:[/bold] http://{host}:{port}\n"
             f"[bold]Storage:[/bold] {storage_path or 'default (~/.passw0rts/vault.enc)'}\n\n"
-            f"[dim]The service will start automatically on system boot[/dim]",
+            "[dim]The service will start automatically on system boot[/dim]",
             title="⚙️  Service"
         ))
         
@@ -710,7 +712,7 @@ def service_install(host, port, storage_path, no_start):
             auto_start=not no_start
         )
         
-        console.print(f"\n[bold green]✓ Service installed successfully![/bold green]")
+        console.print("\n[bold green]✓ Service installed successfully![/bold green]")
         
         if platform.system() == 'Linux':
             console.print(f"\nService file: {result}")
@@ -730,7 +732,7 @@ def service_install(host, port, storage_path, no_start):
             console.print(f"  schtasks /end /tn {result}")
         
         if not no_start:
-            console.print(f"\n[green]Service is now running and will start on system boot[/green]")
+            console.print("\n[green]Service is now running and will start on system boot[/green]")
         
     except NotImplementedError as e:
         console.print(f"[red]{e}[/red]")
@@ -823,7 +825,7 @@ def destroy(storage_path, force):
         session_persist = SessionPersistence()
         if session_persist.session_exists():
             session_persist.clear_session()
-            console.print(f"[green]✓[/green] Session cleared")
+            console.print("[green]✓[/green] Session cleared")
         
         console.print("\n[bold green]✓ Vault destroyed successfully![/bold green]")
         console.print("[dim]Run 'passw0rts init' to create a new vault.[/dim]")
@@ -897,7 +899,7 @@ def add_key(storage_path):
         # Check if key already registered
         if usb_manager.is_device_registered():
             current_device = usb_manager.get_registered_device()
-            console.print(f"\n[yellow]A USB key is already registered:[/yellow]")
+            console.print("\n[yellow]A USB key is already registered:[/yellow]")
             console.print(f"  {current_device}")
             
             if not Confirm.ask("\n[bold]Replace with a new key?[/bold]"):
@@ -934,7 +936,7 @@ def add_key(storage_path):
             if 0 <= device_idx < len(devices):
                 selected_device = devices[device_idx]
                 usb_manager.register_device(selected_device, master_password)
-                console.print(f"\n[bold green]✓ USB key registered successfully![/bold green]")
+                console.print("\n[bold green]✓ USB key registered successfully![/bold green]")
                 console.print(f"Device: {selected_device}")
                 console.print("\n[dim]Note: With USB key registered, master password and TOTP become optional when the key is connected.[/dim]")
             else:
@@ -969,7 +971,7 @@ def remove_key(storage_path):
             return
         
         current_device = usb_manager.get_registered_device()
-        console.print(f"\n[bold]Currently registered USB key:[/bold]")
+        console.print("\n[bold]Currently registered USB key:[/bold]")
         console.print(f"  {current_device}")
         
         # Authenticate first
@@ -1192,7 +1194,7 @@ def _find_entry_by_id(entry_id: str):
         return None
     
     if len(matches) > 1:
-        console.print(f"[yellow]Multiple matches found. Please be more specific:[/yellow]")
+        console.print("[yellow]Multiple matches found. Please be more specific:[/yellow]")
         for e in matches:
             console.print(f"  {e.id[:8]} - {e.title}")
         return None

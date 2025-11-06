@@ -112,7 +112,7 @@ class USBKeyManager:
             if 'response_hash' in data:
                 self._response_hash = data['response_hash']
                 
-        except (FileNotFoundError, json.JSONDecodeError, KeyError, ValueError) as e:
+        except (FileNotFoundError, json.JSONDecodeError, KeyError, ValueError):
             # If config is missing or corrupted, start fresh
             # In production, this could be logged for debugging
             pass
@@ -165,7 +165,7 @@ class USBKeyManager:
                     serial_number = None
                     try:
                         serial_number = dev.serial_number
-                    except (ValueError, usb.core.USBError) as e:
+                    except (ValueError, usb.core.USBError):
                         # Permission denied or device access error
                         # Continue to next device
                         continue
@@ -199,7 +199,7 @@ class USBKeyManager:
                     )
                     devices.append(device)
                     
-                except (ValueError, Exception) as e:
+                except (ValueError, Exception):
                     # Skip devices we can't access (permissions, etc.)
                     # Using Exception to catch usb.core.USBError and other USB-related errors
                     continue

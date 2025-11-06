@@ -150,7 +150,6 @@ class EncryptionManager:
         if self._key:
             # Note: Python's memory management makes true secure wiping difficult
             # This is a best-effort approach
-            key_len = len(self._key)
             self._key = None  # Release reference
             # Force garbage collection (not guaranteed to be immediate)
             import gc

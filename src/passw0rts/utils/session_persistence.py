@@ -115,7 +115,7 @@ class SessionPersistence:
             
             return True
             
-        except Exception as e:
+        except Exception:
             # Silently fail - session will just require re-auth
             return False
     

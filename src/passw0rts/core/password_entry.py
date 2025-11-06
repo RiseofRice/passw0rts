@@ -18,11 +18,7 @@ class PasswordEntry(BaseModel):
     Represents a single password entry in the password manager.
     """
     
-    model_config = ConfigDict(
-        json_encoders={
-            datetime: lambda v: v.isoformat()
-        }
-    )
+    model_config = ConfigDict()
     
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     title: str = Field(..., min_length=1, description="Title/name of the entry")
