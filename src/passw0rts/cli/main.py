@@ -113,7 +113,19 @@ def init(storage_path, auto_lock):
             devices = usb_manager.list_available_devices()
             
             if not devices:
-                console.print("[yellow]No USB devices detected. Make sure your USB key is plugged in.[/yellow]")
+                console.print("[yellow]No USB devices detected.[/yellow]")
+                
+                # Get diagnostic information
+                success, diag_msg = usb_manager.get_usb_diagnostics()
+                console.print(f"\n[dim]{diag_msg}[/dim]")
+                
+                if Confirm.ask("\n[bold]Show troubleshooting help?[/bold]", default=True):
+                    console.print("\n[bold cyan]USB Security Key Troubleshooting:[/bold cyan]")
+                    console.print("1. Make sure your USB device is plugged in")
+                    console.print("2. Some USB devices need to be in a specific mode (e.g., U2F mode for Flipper Zero)")
+                    console.print("3. Ensure the device has a readable serial number")
+                    console.print("4. Check system permissions (see diagnostic message above)")
+                    console.print("\n[dim]You can try registering the USB key later with: passw0rts add-key[/dim]")
             else:
                 console.print(f"\n[bold]Found {len(devices)} USB device(s):[/bold]")
                 
@@ -896,7 +908,18 @@ def add_key(storage_path):
         devices = usb_manager.list_available_devices()
         
         if not devices:
-            console.print("[yellow]No USB devices detected. Make sure your USB key is plugged in.[/yellow]")
+            console.print("[yellow]No USB devices detected.[/yellow]")
+            
+            # Get diagnostic information
+            success, diag_msg = usb_manager.get_usb_diagnostics()
+            console.print(f"\n[dim]{diag_msg}[/dim]")
+            
+            console.print("\n[bold cyan]USB Security Key Troubleshooting:[/bold cyan]")
+            console.print("1. Make sure your USB device is plugged in")
+            console.print("2. Some USB devices need to be in a specific mode (e.g., U2F mode for Flipper Zero)")
+            console.print("3. Ensure the device has a readable serial number")
+            console.print("4. Check system permissions (see diagnostic message above)")
+            console.print("\n[dim]For more help, see: https://github.com/RiseofRice/passw0rts#usb-security-key-authentication[/dim]")
             sys.exit(1)
         
         console.print(f"\n[bold]Found {len(devices)} USB device(s):[/bold]")
