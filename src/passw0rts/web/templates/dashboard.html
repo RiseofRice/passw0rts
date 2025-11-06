@@ -457,6 +457,36 @@
     </div>
     
     <div class="settings-section">
+        <h3>🔐 Security</h3>
+        
+        <div style="margin-bottom: var(--spacing-base);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <strong>TOTP 2FA</strong>
+                <span id="totp-status">Loading...</span>
+            </div>
+            <button class="button" style="width: 100%; margin-bottom: 5px;" onclick="setupTOTP()" id="setup-totp-btn">
+                🔒 Set Up TOTP
+            </button>
+            <button class="button button-danger" style="width: 100%; display: none;" onclick="removeTOTP()" id="remove-totp-btn">
+                🗑️ Remove TOTP
+            </button>
+        </div>
+        
+        <div style="margin-bottom: var(--spacing-base);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <strong>USB Security Key</strong>
+                <span id="usbkey-status">Loading...</span>
+            </div>
+            <button class="button" style="width: 100%; margin-bottom: 5px;" onclick="registerUSBKey()" id="register-usbkey-btn">
+                🔑 Register USB Key
+            </button>
+            <button class="button button-danger" style="width: 100%; display: none;" onclick="removeUSBKey()" id="remove-usbkey-btn">
+                🗑️ Remove USB Key
+            </button>
+        </div>
+    </div>
+    
+    <div class="settings-section">
         <button class="button" style="width: 100%;" onclick="resetSettings()">🔄 Reset to Defaults</button>
     </div>
 </div>
@@ -859,6 +889,215 @@
         div.textContent = text;
         return div.innerHTML;
     }
+    
+    // Security settings functions
+    async function checkSecurityStatus() {
+        // Check TOTP status
+        const totpConfigExists = await fetch('/api/vault/status')
+            .then(r => r.json())
+            .then(data => {
+                // Assume TOTP exists if vault exists (we'll check more carefully later)
+                return data.exists;
+            });
+        
+        // For now, we'll check by trying to access the config
+        // This is a simplified check - in production, you'd have a dedicated endpoint
+        document.getElementById('totp-status').textContent = '❓ Unknown';
+        document.getElementById('setup-totp-btn').style.display = 'block';
+        document.getElementById('remove-totp-btn').style.display = 'none';
+        
+        // Check USB key status
+        try {
+            const usbResponse = await fetch('/api/vault/usbkey/status');
+            const usbData = await usbResponse.json();
+            
+            if (usbData.registered) {
+                document.getElementById('usbkey-status').textContent = usbData.connected ? '✅ Connected' : '⚠️ Registered (Not Connected)';
+                document.getElementById('register-usbkey-btn').style.display = 'none';
+                document.getElementById('remove-usbkey-btn').style.display = 'block';
+            } else {
+                document.getElementById('usbkey-status').textContent = '❌ Not Registered';
+                document.getElementById('register-usbkey-btn').style.display = 'block';
+                document.getElementById('remove-usbkey-btn').style.display = 'none';
+            }
+        } catch (error) {
+            document.getElementById('usbkey-status').textContent = '❓ Error';
+        }
+    }
+    
+    async function setupTOTP() {
+        if (!confirm('Set up TOTP 2FA? You will need an authenticator app.')) {
+            return;
+        }
+        
+        try {
+            const response = await fetch('/api/vault/totp/setup', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'}
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                
+                // Get QR code
+                const qrResponse = await fetch('/api/vault/totp/qrcode', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({secret: data.secret})
+                });
+                
+                if (qrResponse.ok) {
+                    const qrData = await qrResponse.json();
+                    
+                    // Show QR code in a modal or alert
+                    const qrWindow = window.open('', 'TOTP Setup', 'width=400,height=500');
+                    qrWindow.document.write(`
+                        <html>
+                        <head><title>TOTP Setup</title></head>
+                        <body style="font-family: Arial; padding: 20px; text-align: center;">
+                            <h2>🔒 TOTP Setup</h2>
+                            <p>Scan this QR code with your authenticator app:</p>
+                            <img src="${qrData.qr_code}" style="max-width: 100%;">
+                            <p style="word-break: break-all; background: #f0f0f0; padding: 10px; border-radius: 5px;">
+                                <strong>Secret:</strong> ${data.secret}
+                            </p>
+                            <button onclick="window.close()" style="padding: 10px 20px; margin-top: 20px; cursor: pointer;">Close</button>
+                        </body>
+                        </html>
+                    `);
+                    
+                    document.getElementById('totp-status').textContent = '✅ Enabled';
+                    document.getElementById('setup-totp-btn').style.display = 'none';
+                    document.getElementById('remove-totp-btn').style.display = 'block';
+                    
+                    alert('TOTP setup successful! Save the secret in a safe place.');
+                }
+            } else {
+                const errorData = await response.json();
+                alert('Failed to setup TOTP: ' + (errorData.error || 'Unknown error'));
+            }
+        } catch (error) {
+            alert('Error setting up TOTP: ' + error.message);
+        }
+    }
+    
+    async function removeTOTP() {
+        if (!confirm('Remove TOTP 2FA? This will reduce your account security.')) {
+            return;
+        }
+        
+        try {
+            const response = await fetch('/api/vault/totp/remove', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'}
+            });
+            
+            if (response.ok) {
+                document.getElementById('totp-status').textContent = '❌ Disabled';
+                document.getElementById('setup-totp-btn').style.display = 'block';
+                document.getElementById('remove-totp-btn').style.display = 'none';
+                alert('TOTP removed successfully');
+            } else {
+                const errorData = await response.json();
+                alert('Failed to remove TOTP: ' + (errorData.error || 'Unknown error'));
+            }
+        } catch (error) {
+            alert('Error removing TOTP: ' + error.message);
+        }
+    }
+    
+    async function registerUSBKey() {
+        try {
+            // First, get list of USB devices
+            const devicesResponse = await fetch('/api/vault/usbkey/devices');
+            const devicesData = await devicesResponse.json();
+            
+            if (!devicesData.devices || devicesData.devices.length === 0) {
+                alert('No USB devices found. Please plug in your USB security key and try again.');
+                return;
+            }
+            
+            // Show device selection
+            let deviceList = 'Select a USB device:\n\n';
+            devicesData.devices.forEach((device, index) => {
+                deviceList += `${index + 1}. ${device}\n`;
+            });
+            
+            const selection = prompt(deviceList + '\nEnter device number (1-' + devicesData.devices.length + '):');
+            
+            if (!selection) return;
+            
+            const deviceIndex = parseInt(selection) - 1;
+            
+            if (deviceIndex < 0 || deviceIndex >= devicesData.devices.length) {
+                alert('Invalid selection');
+                return;
+            }
+            
+            // Ask for master password for verification
+            const masterPassword = prompt('Enter your master password to register the USB key:');
+            
+            if (!masterPassword) return;
+            
+            // Register the device
+            const registerResponse = await fetch('/api/vault/usbkey/register', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    device_index: deviceIndex,
+                    master_password: masterPassword
+                })
+            });
+            
+            if (registerResponse.ok) {
+                const registerData = await registerResponse.json();
+                alert('USB key registered successfully!\n\nDevice: ' + registerData.device);
+                checkSecurityStatus();
+            } else {
+                const errorData = await registerResponse.json();
+                alert('Failed to register USB key: ' + (errorData.error || 'Unknown error'));
+            }
+        } catch (error) {
+            alert('Error registering USB key: ' + error.message);
+        }
+    }
+    
+    async function removeUSBKey() {
+        if (!confirm('Remove USB security key? You will need to use password authentication.')) {
+            return;
+        }
+        
+        try {
+            const response = await fetch('/api/vault/usbkey/remove', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'}
+            });
+            
+            if (response.ok) {
+                document.getElementById('usbkey-status').textContent = '❌ Not Registered';
+                document.getElementById('register-usbkey-btn').style.display = 'block';
+                document.getElementById('remove-usbkey-btn').style.display = 'none';
+                alert('USB key removed successfully');
+            } else {
+                const errorData = await response.json();
+                alert('Failed to remove USB key: ' + (errorData.error || 'Unknown error'));
+            }
+        } catch (error) {
+            alert('Error removing USB key: ' + error.message);
+        }
+    }
+    
+    // Check security status when opening settings
+    document.addEventListener('DOMContentLoaded', () => {
+        const settingsBtn = document.querySelector('[onclick="openSettings()"]');
+        if (settingsBtn) {
+            const originalOpenSettings = window.openSettings;
+            window.openSettings = function() {
+                if (originalOpenSettings) originalOpenSettings();
+                checkSecurityStatus();
+            };
+        }
+    });
     
     // Close modal when clicking outside
     window.onclick = function(event) {
