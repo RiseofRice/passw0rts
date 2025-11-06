@@ -17,9 +17,9 @@ class PasswordEntry(BaseModel):
     """
     Represents a single password entry in the password manager.
     """
-    
+
     model_config = ConfigDict()
-    
+
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     title: str = Field(..., min_length=1, description="Title/name of the entry")
     username: Optional[str] = Field(None, description="Username or email")
@@ -30,11 +30,11 @@ class PasswordEntry(BaseModel):
     tags: list[str] = Field(default_factory=list, description="Tags for search")
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
-    
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for serialization"""
         return self.model_dump(mode='json')
-    
+
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'PasswordEntry':
         """Create from dictionary"""
@@ -44,14 +44,14 @@ class PasswordEntry(BaseModel):
         if isinstance(data.get('updated_at'), str):
             data['updated_at'] = datetime.fromisoformat(data['updated_at'])
         return cls(**data)
-    
+
     def matches_search(self, query: str) -> bool:
         """
         Check if this entry matches a search query.
-        
+
         Args:
             query: Search query string (case-insensitive)
-            
+
         Returns:
             True if entry matches the query
         """
@@ -64,9 +64,9 @@ class PasswordEntry(BaseModel):
             self.category or "",
             " ".join(self.tags),
         ]
-        
+
         return any(query in field.lower() for field in searchable_fields)
-    
+
     def update_timestamp(self):
         """Update the updated_at timestamp"""
         self.updated_at = utc_now()

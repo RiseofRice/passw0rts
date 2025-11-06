@@ -10,12 +10,12 @@ class ClipboardHandler:
     """
     Handles clipboard operations with automatic clearing.
     """
-    
+
     @staticmethod
     def copy(text: str):
         """
         Copy text to clipboard.
-        
+
         Args:
             text: Text to copy
         """
@@ -25,7 +25,7 @@ class ClipboardHandler:
             # Fallback for systems without clipboard support
             import sys
             print(f"Warning: Clipboard operation failed: {e}", file=sys.stderr)
-    
+
     @staticmethod
     def clear():
         """Clear the clipboard"""
@@ -34,28 +34,28 @@ class ClipboardHandler:
         except Exception:
             # Silent failure is acceptable for clipboard clearing
             pass
-    
+
     @staticmethod
     def copy_with_timeout(text: str, timeout: int = 30):
         """
         Copy text to clipboard and clear after timeout.
-        
+
         Args:
             text: Text to copy
             timeout: Seconds before clearing (default: 30)
         """
         ClipboardHandler.copy(text)
-        
+
         # Set up timer to clear
         timer = threading.Timer(timeout, ClipboardHandler.clear)
         timer.daemon = True
         timer.start()
-    
+
     @staticmethod
     def paste() -> str:
         """
         Get text from clipboard.
-        
+
         Returns:
             Clipboard content
         """
