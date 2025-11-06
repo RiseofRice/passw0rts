@@ -2,9 +2,10 @@
 Unit tests for DaemonManager
 """
 
-import pytest
 from pathlib import Path
 from unittest.mock import Mock, patch, MagicMock
+
+import pytest
 
 from passw0rts.utils.daemon_manager import DaemonManager
 
