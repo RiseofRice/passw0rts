@@ -160,8 +160,17 @@ class USBKeyManager:
             
             for dev in usb_devices:
                 try:
+                    # Try to access the serial number - this may fail due to permissions
+                    serial_number = None
+                    try:
+                        serial_number = dev.serial_number
+                    except (ValueError, usb.core.USBError) as e:
+                        # Permission denied or device access error
+                        # Continue to next device
+                        continue
+                    
                     # Skip devices without serial numbers
-                    if not dev.serial_number:
+                    if not serial_number:
                         continue
                     
                     # Get device info
@@ -170,18 +179,20 @@ class USBKeyManager:
                     
                     try:
                         manufacturer = usb.util.get_string(dev, dev.iManufacturer) if dev.iManufacturer else ""
-                    except:
+                    except (ValueError, usb.core.USBError):
+                        # Can't read manufacturer string (permission or protocol issue)
                         pass
                     
                     try:
                         product = usb.util.get_string(dev, dev.iProduct) if dev.iProduct else ""
-                    except:
+                    except (ValueError, usb.core.USBError):
+                        # Can't read product string (permission or protocol issue)
                         pass
                     
                     device = USBDevice(
                         vendor_id=dev.idVendor,
                         product_id=dev.idProduct,
-                        serial_number=dev.serial_number,
+                        serial_number=serial_number,
                         manufacturer=manufacturer,
                         product=product
                     )
@@ -200,6 +211,140 @@ class USBKeyManager:
             pass
         
         return devices
+    
+    def get_usb_diagnostics(self) -> Tuple[bool, str]:
+        """
+        Get diagnostic information about USB device detection capabilities.
+        
+        Returns:
+            Tuple of (success: bool, message: str)
+            - success: True if USB detection is working
+            - message: Diagnostic message with details and suggestions
+        """
+        try:
+            import usb.core
+            import usb.util
+            import usb.backend.libusb1
+            import usb.backend.libusb0
+            import usb.backend.openusb
+            import platform
+            
+            # Check if we have a working backend
+            backend = None
+            backend_name = "unknown"
+            
+            try:
+                backend = usb.backend.libusb1.get_backend()
+                if backend:
+                    backend_name = "libusb1"
+            except Exception:
+                pass
+            
+            if not backend:
+                try:
+                    backend = usb.backend.libusb0.get_backend()
+                    if backend:
+                        backend_name = "libusb0"
+                except Exception:
+                    pass
+            
+            if not backend:
+                try:
+                    backend = usb.backend.openusb.get_backend()
+                    if backend:
+                        backend_name = "openusb"
+                except Exception:
+                    pass
+            
+            if not backend:
+                msg = "No USB backend available.\n"
+                msg += "Please install libusb:\n"
+                if platform.system() == "Linux":
+                    msg += "  Ubuntu/Debian: sudo apt-get install libusb-1.0-0\n"
+                    msg += "  Fedora/RHEL: sudo dnf install libusb\n"
+                    msg += "  Arch: sudo pacman -S libusb"
+                elif platform.system() == "Darwin":
+                    msg += "  macOS: brew install libusb"
+                elif platform.system() == "Windows":
+                    msg += "  Windows: Install via https://github.com/libusb/libusb/releases"
+                return (False, msg)
+            
+            # Try to enumerate devices
+            try:
+                usb_devices = list(usb.core.find(find_all=True))
+                device_count = len(usb_devices)
+                
+                if device_count == 0:
+                    msg = f"USB backend ({backend_name}) is working, but no USB devices detected.\n"
+                    msg += "\nPossible causes:\n"
+                    msg += "  1. No USB devices are currently connected\n"
+                    msg += "  2. USB devices don't have accessible serial numbers\n"
+                    msg += "  3. Permission issues preventing device access\n"
+                    
+                    if platform.system() == "Linux":
+                        msg += "\nLinux permissions fix:\n"
+                        msg += "  1. Add your user to the 'plugdev' group: sudo usermod -a -G plugdev $USER\n"
+                        msg += "  2. Create udev rule: /etc/udev/rules.d/50-usb.rules\n"
+                        msg += "     SUBSYSTEM==\"usb\", MODE=\"0666\"\n"
+                        msg += "  3. Reload rules: sudo udevadm control --reload-rules\n"
+                        msg += "  4. Re-plug your USB device or reboot\n"
+                        msg += "\nOr run as root (not recommended): sudo passw0rts ..."
+                    elif platform.system() == "Darwin":
+                        msg += "\nOn macOS, you may need to grant terminal access to USB devices."
+                    elif platform.system() == "Windows":
+                        msg += "\nOn Windows, you may need to install device drivers or run as Administrator."
+                    
+                    return (False, msg)
+                
+                # Check how many devices have accessible serial numbers
+                accessible_count = 0
+                permission_denied_count = 0
+                no_serial_count = 0
+                
+                for dev in usb_devices:
+                    try:
+                        serial = dev.serial_number
+                        if serial:
+                            accessible_count += 1
+                        else:
+                            no_serial_count += 1
+                    except (ValueError, usb.core.USBError):
+                        permission_denied_count += 1
+                
+                if accessible_count > 0:
+                    msg = f"USB detection working! Backend: {backend_name}\n"
+                    msg += f"Found {accessible_count} accessible device(s) with serial numbers."
+                    return (True, msg)
+                else:
+                    msg = f"Found {device_count} USB device(s) but none are accessible.\n"
+                    msg += f"  - {permission_denied_count} device(s): permission denied\n"
+                    msg += f"  - {no_serial_count} device(s): no serial number\n"
+                    msg += "\nDevices need serial numbers to be used as security keys.\n"
+                    
+                    if permission_denied_count > 0:
+                        msg += "\nPermission issues detected. "
+                        if platform.system() == "Linux":
+                            msg += "Try the Linux permissions fix above."
+                        elif platform.system() == "Darwin":
+                            msg += "Grant terminal USB access in System Preferences."
+                        elif platform.system() == "Windows":
+                            msg += "Try running as Administrator."
+                    
+                    return (False, msg)
+                    
+            except Exception as e:
+                msg = f"Error enumerating USB devices: {type(e).__name__}: {e}\n"
+                msg += "This may indicate a permission or driver issue."
+                return (False, msg)
+                
+        except ImportError as e:
+            msg = "PyUSB library not available.\n"
+            msg += f"Error: {e}\n"
+            msg += "Install with: pip install pyusb"
+            return (False, msg)
+        except Exception as e:
+            msg = f"Unexpected error checking USB: {type(e).__name__}: {e}"
+            return (False, msg)
     
     def register_device(self, device: USBDevice, master_password: str) -> bytes:
         """

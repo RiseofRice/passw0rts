@@ -337,3 +337,23 @@ class TestUSBKeyIntegration:
         # Unregister
         manager2.unregister_device()
         assert not manager2.is_device_registered()
+    
+    def test_usb_diagnostics(self, temp_config_dir):
+        """Test USB diagnostic information"""
+        config_path = os.path.join(temp_config_dir, "config.usbkey")
+        manager = USBKeyManager(config_path)
+        
+        # Get diagnostics
+        success, message = manager.get_usb_diagnostics()
+        
+        # Should return a tuple with bool and string
+        assert isinstance(success, bool)
+        assert isinstance(message, str)
+        assert len(message) > 0
+        
+        # Message should contain helpful information
+        # In test environment with no USB devices, should have diagnostic info
+        if not success:
+            # Should mention possible causes or solutions
+            assert any(keyword in message.lower() for keyword in 
+                      ['permission', 'backend', 'libusb', 'device', 'install'])
