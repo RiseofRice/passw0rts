@@ -102,7 +102,7 @@ passw0rts remove-key   # Remove registered USB key
 ### Web UI
 
 ```bash
-# Start the web server
+# Start the web server (foreground)
 passw0rts web
 
 # Custom host and port
@@ -111,12 +111,49 @@ passw0rts web --host 0.0.0.0 --port 8080
 # Access at http://127.0.0.1:5000
 ```
 
+#### Run as Background Daemon
+
+```bash
+# Start as background daemon
+passw0rts daemon-start
+
+# Custom host and port
+passw0rts daemon-start --host 0.0.0.0 --port 8080
+
+# Check daemon status
+passw0rts daemon-status
+
+# View daemon logs
+passw0rts daemon-logs
+
+# Stop daemon
+passw0rts daemon-stop
+
+# Restart daemon
+passw0rts daemon-restart
+```
+
+#### Install as System Service (Auto-start on Boot)
+
+```bash
+# Install system service
+passw0rts service-install
+
+# Service will now start automatically on system boot
+# Supports Linux (systemd), macOS (launchd), and Windows (Task Scheduler)
+
+# Uninstall service
+passw0rts service-uninstall
+```
+
 The web UI provides:
 - Modern, responsive dashboard
 - Dark/light theme toggle
 - Password management (add/edit/delete/search)
 - Password generator
 - Secure session management
+- Background daemon mode for persistent operation
+- System service integration for automatic startup
 
 ## Architecture
 

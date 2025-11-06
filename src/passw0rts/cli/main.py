@@ -530,6 +530,236 @@ def web(host, port, storage_path):
         sys.exit(1)
 
 
+@main.command(name='daemon-start')
+@click.option('--host', default='127.0.0.1', help='Host address')
+@click.option('--port', type=int, default=5000, help='Port number')
+@click.option('--storage-path', type=click.Path(), help='Custom storage path')
+def daemon_start(host, port, storage_path):
+    """Start the web server as a background daemon"""
+    try:
+        from passw0rts.utils import DaemonManager
+        
+        daemon = DaemonManager()
+        
+        if daemon.is_running():
+            console.print("[yellow]Daemon is already running![/yellow]")
+            pid = daemon.get_pid()
+            console.print(f"PID: {pid}")
+            console.print(f"Access at: http://{host}:{port}")
+            return
+        
+        console.print(Panel.fit(
+            f"[bold cyan]Starting Passw0rts Web Daemon[/bold cyan]\n\n"
+            f"[bold]URL:[/bold] http://{host}:{port}\n"
+            f"[bold]Storage:[/bold] {storage_path or 'default (~/.passw0rts/vault.enc)'}\n\n"
+            f"[dim]Use 'passw0rts daemon-stop' to stop the server[/dim]\n"
+            f"[dim]Use 'passw0rts daemon-logs' to view logs[/dim]",
+            title="🚀 Daemon"
+        ))
+        
+        pid = daemon.start(host=host, port=port, storage_path=storage_path)
+        
+        console.print(f"\n[bold green]✓ Daemon started successfully![/bold green]")
+        console.print(f"PID: {pid}")
+        console.print(f"Log file: {daemon.log_file}")
+        
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+        sys.exit(1)
+
+
+@main.command(name='daemon-stop')
+def daemon_stop():
+    """Stop the running web daemon"""
+    try:
+        from passw0rts.utils import DaemonManager
+        
+        daemon = DaemonManager()
+        
+        if not daemon.is_running():
+            console.print("[yellow]Daemon is not running[/yellow]")
+            return
+        
+        pid = daemon.get_pid()
+        console.print(f"[yellow]Stopping daemon (PID: {pid})...[/yellow]")
+        
+        daemon.stop()
+        
+        console.print("[bold green]✓ Daemon stopped successfully![/bold green]")
+        
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+        sys.exit(1)
+
+
+@main.command(name='daemon-restart')
+@click.option('--host', default='127.0.0.1', help='Host address')
+@click.option('--port', type=int, default=5000, help='Port number')
+@click.option('--storage-path', type=click.Path(), help='Custom storage path')
+def daemon_restart(host, port, storage_path):
+    """Restart the web daemon"""
+    try:
+        from passw0rts.utils import DaemonManager
+        
+        daemon = DaemonManager()
+        
+        console.print("[yellow]Restarting daemon...[/yellow]")
+        
+        pid = daemon.restart(host=host, port=port, storage_path=storage_path)
+        
+        console.print(f"\n[bold green]✓ Daemon restarted successfully![/bold green]")
+        console.print(f"PID: {pid}")
+        console.print(f"Access at: http://{host}:{port}")
+        
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+        sys.exit(1)
+
+
+@main.command(name='daemon-status')
+def daemon_status():
+    """Check the status of the web daemon"""
+    try:
+        from passw0rts.utils import DaemonManager
+        
+        daemon = DaemonManager()
+        
+        if daemon.is_running():
+            pid = daemon.get_pid()
+            console.print(Panel.fit(
+                f"[bold green]✓ Daemon is running[/bold green]\n\n"
+                f"[bold]PID:[/bold] {pid}\n"
+                f"[bold]Log file:[/bold] {daemon.log_file}\n\n"
+                f"[dim]Use 'passw0rts daemon-logs' to view logs[/dim]",
+                title="📊 Status"
+            ))
+        else:
+            console.print(Panel.fit(
+                "[yellow]Daemon is not running[/yellow]\n\n"
+                "[dim]Use 'passw0rts daemon-start' to start[/dim]",
+                title="📊 Status"
+            ))
+        
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+        sys.exit(1)
+
+
+@main.command(name='daemon-logs')
+@click.option('--lines', type=int, default=50, help='Number of lines to show')
+def daemon_logs(lines):
+    """View daemon log output"""
+    try:
+        from passw0rts.utils import DaemonManager
+        
+        daemon = DaemonManager()
+        logs = daemon.get_logs(lines=lines)
+        
+        console.print(Panel.fit(
+            f"[dim]{logs}[/dim]",
+            title=f"📋 Last {lines} lines"
+        ))
+        
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+        sys.exit(1)
+
+
+@main.command(name='service-install')
+@click.option('--host', default='127.0.0.1', help='Host address')
+@click.option('--port', type=int, default=5000, help='Port number')
+@click.option('--storage-path', type=click.Path(), help='Custom storage path')
+@click.option('--no-start', is_flag=True, help='Do not start service after installation')
+def service_install(host, port, storage_path, no_start):
+    """Install system service for automatic startup"""
+    try:
+        from passw0rts.utils import DaemonManager
+        import platform
+        
+        daemon = DaemonManager()
+        
+        console.print(Panel.fit(
+            f"[bold cyan]Installing System Service[/bold cyan]\n\n"
+            f"[bold]Platform:[/bold] {platform.system()}\n"
+            f"[bold]URL:[/bold] http://{host}:{port}\n"
+            f"[bold]Storage:[/bold] {storage_path or 'default (~/.passw0rts/vault.enc)'}\n\n"
+            f"[dim]The service will start automatically on system boot[/dim]",
+            title="⚙️  Service"
+        ))
+        
+        if not Confirm.ask("\n[bold]Continue with installation?[/bold]", default=True):
+            console.print("[yellow]Installation cancelled[/yellow]")
+            return
+        
+        result = daemon.install_service(
+            host=host, 
+            port=port, 
+            storage_path=storage_path,
+            auto_start=not no_start
+        )
+        
+        console.print(f"\n[bold green]✓ Service installed successfully![/bold green]")
+        
+        if platform.system() == 'Linux':
+            console.print(f"\nService file: {result}")
+            console.print("\nManage with systemctl:")
+            console.print("  systemctl --user start passw0rts-web")
+            console.print("  systemctl --user stop passw0rts-web")
+            console.print("  systemctl --user status passw0rts-web")
+        elif platform.system() == 'Darwin':
+            console.print(f"\nPlist file: {result}")
+            console.print("\nManage with launchctl:")
+            console.print(f"  launchctl load {result}")
+            console.print(f"  launchctl unload {result}")
+        elif platform.system() == 'Windows':
+            console.print(f"\nTask name: {result}")
+            console.print("\nManage with Task Scheduler or:")
+            console.print(f"  schtasks /run /tn {result}")
+            console.print(f"  schtasks /end /tn {result}")
+        
+        if not no_start:
+            console.print(f"\n[green]Service is now running and will start on system boot[/green]")
+        
+    except NotImplementedError as e:
+        console.print(f"[red]{e}[/red]")
+        sys.exit(1)
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+        sys.exit(1)
+
+
+@main.command(name='service-uninstall')
+def service_uninstall():
+    """Uninstall system service"""
+    try:
+        from passw0rts.utils import DaemonManager
+        
+        daemon = DaemonManager()
+        
+        console.print(Panel.fit(
+            "[bold yellow]Uninstalling System Service[/bold yellow]\n\n"
+            "This will remove the automatic startup service.\n"
+            "The web server will no longer start on system boot.",
+            title="⚙️  Service"
+        ))
+        
+        if not Confirm.ask("\n[bold]Continue with uninstallation?[/bold]", default=True):
+            console.print("[yellow]Uninstallation cancelled[/yellow]")
+            return
+        
+        daemon.uninstall_service()
+        
+        console.print("\n[bold green]✓ Service uninstalled successfully![/bold green]")
+        console.print("[dim]You can still use 'passw0rts daemon-start' to run the server manually[/dim]")
+        
+    except NotImplementedError as e:
+        console.print(f"[red]{e}[/red]")
+        sys.exit(1)
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+        sys.exit(1)
+
+
 @main.command()
 @click.option('--storage-path', type=click.Path(), help='Custom storage path')
 @click.option('--force', is_flag=True, help='Skip confirmation prompt')
