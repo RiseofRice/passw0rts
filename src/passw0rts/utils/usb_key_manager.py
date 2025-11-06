@@ -9,6 +9,7 @@ combined with challenge-response for secure authentication.
 import json
 import hashlib
 import secrets
+import platform
 from typing import Optional, Dict, List, Tuple
 from pathlib import Path
 
@@ -227,32 +228,24 @@ class USBKeyManager:
             import usb.backend.libusb1
             import usb.backend.libusb0
             import usb.backend.openusb
-            import platform
             
             # Check if we have a working backend
             backend = None
             backend_name = "unknown"
             
-            try:
-                backend = usb.backend.libusb1.get_backend()
-                if backend:
-                    backend_name = "libusb1"
-            except Exception:
-                pass
+            # Try backends in order of preference
+            backend_modules = [
+                (usb.backend.libusb1, "libusb1"),
+                (usb.backend.libusb0, "libusb0"),
+                (usb.backend.openusb, "openusb")
+            ]
             
-            if not backend:
+            for backend_module, name in backend_modules:
                 try:
-                    backend = usb.backend.libusb0.get_backend()
+                    backend = backend_module.get_backend()
                     if backend:
-                        backend_name = "libusb0"
-                except Exception:
-                    pass
-            
-            if not backend:
-                try:
-                    backend = usb.backend.openusb.get_backend()
-                    if backend:
-                        backend_name = "openusb"
+                        backend_name = name
+                        break
                 except Exception:
                     pass
             

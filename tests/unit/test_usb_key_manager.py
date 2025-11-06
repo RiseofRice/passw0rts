@@ -355,5 +355,5 @@ class TestUSBKeyIntegration:
         # In test environment with no USB devices, should have diagnostic info
         if not success:
             # Should mention possible causes or solutions
-            assert any(keyword in message.lower() for keyword in 
-                      ['permission', 'backend', 'libusb', 'device', 'install'])
+            expected_keywords = ['permission', 'backend', 'libusb', 'device', 'install']
+            assert any(keyword in message.lower() for keyword in expected_keywords)
