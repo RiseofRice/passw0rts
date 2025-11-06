@@ -55,8 +55,10 @@ def main():
         # Create and run the Flask app
         app = create_app(storage_path=args.storage_path)
         
-        # Use werkzeug's built-in server (suitable for local use)
-        # For production, consider using gunicorn or waitress
+        # Use werkzeug's built-in server (suitable for local/personal use)
+        # Note: This is a password manager designed for personal use on trusted local networks.
+        # The built-in Flask/werkzeug server is appropriate for this use case.
+        # For internet-facing production deployments, consider using gunicorn or waitress.
         app.run(
             host=args.host,
             port=args.port,

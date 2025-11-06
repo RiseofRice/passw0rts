@@ -7,8 +7,23 @@ import sys
 import platform
 import subprocess
 import signal
+import time
 from pathlib import Path
 from typing import Optional
+
+# Windows-specific imports (only available on Windows)
+if platform.system() == 'Windows':
+    try:
+        # These may not be available on all Python installations
+        CREATE_NEW_PROCESS_GROUP = subprocess.CREATE_NEW_PROCESS_GROUP
+        DETACHED_PROCESS = subprocess.DETACHED_PROCESS
+    except AttributeError:
+        # Fallback values if not available
+        CREATE_NEW_PROCESS_GROUP = 0x00000200
+        DETACHED_PROCESS = 0x00000008
+else:
+    CREATE_NEW_PROCESS_GROUP = None
+    DETACHED_PROCESS = None
 
 
 class DaemonManager:
@@ -47,6 +62,22 @@ class DaemonManager:
         except (OSError, ValueError):
             return None
     
+    def _kill_process(self, pid: int, force: bool = False):
+        """
+        Kill a process by PID.
+        
+        Args:
+            pid: Process ID to kill
+            force: If True, use SIGKILL/taskkill -F. If False, use SIGTERM/taskkill
+        """
+        if self.system == 'Windows':
+            # Windows doesn't have SIGTERM, use taskkill
+            subprocess.run(['taskkill', '/F', '/PID', str(pid)], 
+                         capture_output=True, check=False)
+        else:
+            sig = signal.SIGKILL if force else signal.SIGTERM
+            os.kill(pid, sig)
+    
     def start(self, host: str = '127.0.0.1', port: int = 5000, storage_path: Optional[str] = None):
         """Start the web server as a daemon"""
         if self.is_running():
@@ -65,7 +96,10 @@ class DaemonManager:
         # Start daemon process
         if self.system == 'Windows':
             # Windows: Use CREATE_NEW_PROCESS_GROUP and DETACHED_PROCESS
-            creation_flags = subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS
+            if CREATE_NEW_PROCESS_GROUP is not None and DETACHED_PROCESS is not None:
+                creation_flags = CREATE_NEW_PROCESS_GROUP | DETACHED_PROCESS
+            else:
+                creation_flags = 0x00000200 | 0x00000008
             process = subprocess.Popen(
                 cmd,
                 stdout=open(self.log_file, 'a'),
@@ -102,15 +136,9 @@ class DaemonManager:
         
         # Send SIGTERM to gracefully shutdown
         try:
-            if self.system == 'Windows':
-                # Windows doesn't have SIGTERM, use taskkill
-                subprocess.run(['taskkill', '/F', '/PID', str(pid)], 
-                             capture_output=True, check=False)
-            else:
-                os.kill(pid, signal.SIGTERM)
+            self._kill_process(pid, force=False)
                 
             # Wait a moment for graceful shutdown
-            import time
             for _ in range(10):
                 if not self.is_running():
                     break
@@ -118,11 +146,7 @@ class DaemonManager:
             
             # Force kill if still running
             if self.is_running():
-                if self.system == 'Windows':
-                    subprocess.run(['taskkill', '/F', '/PID', str(pid)], 
-                                 capture_output=True, check=False)
-                else:
-                    os.kill(pid, signal.SIGKILL)
+                self._kill_process(pid, force=True)
         
         finally:
             # Clean up PID file
@@ -133,7 +157,6 @@ class DaemonManager:
         if self.is_running():
             self.stop()
         
-        import time
         time.sleep(1)  # Brief pause before restart
         
         return self.start(host, port, storage_path)
