@@ -259,11 +259,16 @@
                 Time-based One-Time Password provides an extra layer of security. Recommended for enhanced protection.
             </div>
             <div id="totp-container" class="qr-container">
-                <p style="color: #333; margin-bottom: 10px;">Scan this QR code with your authenticator app:</p>
-                <img id="qr-code" src="" alt="TOTP QR Code">
-                <div class="secret-display">
-                    Secret: <span id="totp-secret"></span>
+                <div id="qr-content" style="display: none;">
+                    <p style="color: #333; margin-bottom: 10px;">Scan this QR code with your authenticator app:</p>
+                    <img id="qr-code" src="" alt="TOTP QR Code">
+                    <div class="secret-display">
+                        Secret: <span id="totp-secret"></span>
+                    </div>
                 </div>
+                <p id="qr-placeholder" style="color: var(--text-secondary); margin: 20px 0;">
+                    QR code will be displayed here after vault initialization.
+                </p>
             </div>
         </div>
         
@@ -474,9 +479,15 @@
                     const qrData = await qrResponse.json();
                     if (qrResponse.ok) {
                         document.getElementById('qr-code').src = qrData.qr_code;
+                        // Show QR content and hide placeholder
+                        document.getElementById('qr-content').style.display = 'block';
+                        document.getElementById('qr-placeholder').style.display = 'none';
                     } else {
                         // QR code generation failed, but we have the secret
                         console.warn('QR code generation failed:', qrData.error);
+                        // Show the content with secret even without QR
+                        document.getElementById('qr-content').style.display = 'block';
+                        document.getElementById('qr-placeholder').style.display = 'none';
                         if (qrData.uri) {
                             // Show the URI as fallback
                             const qrContainer = document.getElementById('totp-container');
@@ -488,7 +499,9 @@
                     }
                 } catch (qrError) {
                     console.error('QR code generation error:', qrError);
-                    // Continue anyway - user has the secret
+                    // Show the secret even if QR generation fails
+                    document.getElementById('qr-content').style.display = 'block';
+                    document.getElementById('qr-placeholder').style.display = 'none';
                 }
             }
             
