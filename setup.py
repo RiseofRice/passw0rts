@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="passw0rts",
-    version="0.1.5",
+    version="0.2",
     packages=find_packages(where="src"),
     package_dir={"": "src"},
     package_data={
@@ -13,6 +13,7 @@ setup(
         "cryptography>=41.0.7",
         "pyotp>=2.9.0",
         "qrcode>=8.0",
+        "pyusb>=1.2.1",
         "click>=8.1.7",
         "rich>=13.7.0",
         "pyperclip>=1.8.2",

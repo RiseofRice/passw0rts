@@ -169,6 +169,27 @@
         CustomizationManager.setTheme(theme);
     }
     
+    // Check if vault exists on page load
+    async function checkVaultExists() {
+        try {
+            const response = await fetch('/api/vault/status');
+            const data = await response.json();
+            
+            if (!data.exists) {
+                // Redirect to initialization page
+                window.location.href = '/init';
+            }
+        } catch (error) {
+            console.error('Failed to check vault status:', error);
+            // Show error to user if fetch fails
+            errorDiv.textContent = 'Unable to connect to server. Please check your connection and refresh the page.';
+            errorDiv.style.display = 'block';
+        }
+    }
+    
+    // Check vault on page load
+    checkVaultExists();
+    
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
         
