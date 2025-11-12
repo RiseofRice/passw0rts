@@ -355,6 +355,11 @@
         }
     });
     
+    // Initialize TOTP container visibility on page load
+    if (enableTotpCheckbox.checked) {
+        totpContainer.style.display = 'block';
+    }
+    
     // Toggle USB key option
     enableUsbKeyCheckbox.addEventListener('change', () => {
         if (enableUsbKeyCheckbox.checked) {
@@ -455,57 +460,88 @@
                 totpSecret = initData.totp_secret;
                 document.getElementById('totp-secret').textContent = totpSecret;
                 
-                const qrResponse = await fetch('/api/vault/totp/qrcode', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        secret: totpSecret
-                    })
-                });
-                
-                const qrData = await qrResponse.json();
-                if (qrResponse.ok) {
-                    document.getElementById('qr-code').src = qrData.qr_code;
-                }
-            }
-            
-            // Step 3: Register USB key if enabled (need to authenticate first)
-            if (enableUsbKeyCheckbox.checked && selectedDeviceIndex !== null) {
-                // First, login to get authenticated session
-                const loginResponse = await fetch('/api/auth/login', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        master_password: masterPassword
-                    })
-                });
-                
-                if (loginResponse.ok) {
-                    // Now register the USB key
-                    const usbResponse = await fetch('/api/vault/usbkey/register', {
+                try {
+                    const qrResponse = await fetch('/api/vault/totp/qrcode', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
                         },
                         body: JSON.stringify({
-                            device_index: selectedDeviceIndex,
+                            secret: totpSecret
+                        })
+                    });
+                    
+                    const qrData = await qrResponse.json();
+                    if (qrResponse.ok) {
+                        document.getElementById('qr-code').src = qrData.qr_code;
+                    } else {
+                        // QR code generation failed, but we have the secret
+                        console.warn('QR code generation failed:', qrData.error);
+                        if (qrData.uri) {
+                            // Show the URI as fallback
+                            const qrContainer = document.getElementById('totp-container');
+                            const fallbackMsg = document.createElement('p');
+                            fallbackMsg.style.color = 'var(--warning)';
+                            fallbackMsg.textContent = 'QR code generation failed. Use the secret above or this URI: ' + qrData.uri;
+                            qrContainer.appendChild(fallbackMsg);
+                        }
+                    }
+                } catch (qrError) {
+                    console.error('QR code generation error:', qrError);
+                    // Continue anyway - user has the secret
+                }
+            }
+            
+            // Step 3: Register USB key if enabled (need to authenticate first)
+            let usbKeyRegistered = false;
+            if (enableUsbKeyCheckbox.checked && selectedDeviceIndex !== null) {
+                try {
+                    // First, login to get authenticated session
+                    const loginResponse = await fetch('/api/auth/login', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
                             master_password: masterPassword
                         })
                     });
                     
-                    if (!usbResponse.ok) {
-                        const usbData = await usbResponse.json();
-                        throw new Error(usbData.error || 'Failed to register USB key');
+                    if (loginResponse.ok) {
+                        // Now register the USB key
+                        const usbResponse = await fetch('/api/vault/usbkey/register', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                device_index: selectedDeviceIndex,
+                                master_password: masterPassword
+                            })
+                        });
+                        
+                        if (usbResponse.ok) {
+                            usbKeyRegistered = true;
+                        } else {
+                            const usbData = await usbResponse.json();
+                            console.error('USB key registration failed:', usbData.error);
+                        }
+                    } else {
+                        console.warn('Login failed, USB key registration skipped');
                     }
+                } catch (usbError) {
+                    console.error('USB key registration error:', usbError);
+                    // Don't fail the whole initialization for USB key errors
                 }
             }
             
             submitBtn.innerHTML = '✅ Success!';
-            successDiv.textContent = 'Vault initialized successfully! Redirecting to login...';
+            let successMessage = 'Vault initialized successfully!';
+            if (enableUsbKeyCheckbox.checked && selectedDeviceIndex !== null && !usbKeyRegistered) {
+                successMessage += ' However, USB key registration was skipped. You can register it later from the dashboard.';
+            }
+            successMessage += ' Redirecting to login...';
+            successDiv.textContent = successMessage;
             successDiv.style.display = 'block';
             errorDiv.style.display = 'none';
             

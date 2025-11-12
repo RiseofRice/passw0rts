@@ -1096,10 +1096,15 @@
     // Check security status when opening settings
     document.addEventListener('DOMContentLoaded', () => {
         const settingsBtn = document.querySelector('[onclick="openSettings()"]');
-        if (settingsBtn) {
+        if (settingsBtn && typeof window.openSettings === 'function') {
             const originalOpenSettings = window.openSettings;
             window.openSettings = function() {
-                if (originalOpenSettings) originalOpenSettings();
+                originalOpenSettings();
+                checkSecurityStatus();
+            };
+        } else if (settingsBtn) {
+            // openSettings not defined yet, create it
+            window.openSettings = function() {
                 checkSecurityStatus();
             };
         }

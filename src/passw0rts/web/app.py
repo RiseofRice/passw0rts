@@ -348,6 +348,8 @@ def create_app(storage_path=None, secret_key=None):
     @app.route('/api/vault/totp/qrcode', methods=['POST'])
     def get_totp_qrcode():
         """Get TOTP QR code for a secret"""
+        # Note: This endpoint is used during vault initialization (before authentication)
+        # and after authentication. We check if Pillow is available and provide helpful error.
         data = request.json
         secret = data.get('secret')
 
@@ -365,6 +367,14 @@ def create_app(storage_path=None, secret_key=None):
                 'uri': totp_manager.get_provisioning_uri('passw0rts')
             })
 
+        except ImportError as e:
+            # Provide helpful error message if Pillow is not installed
+            logger.error(f"Pillow not installed: {str(e)}", exc_info=True)
+            return jsonify({
+                'error': 'QR code generation requires Pillow. Install it with: pip install pillow',
+                'uri': TOTPManager(secret).get_provisioning_uri('passw0rts'),
+                'secret': secret
+            }), 500
         except Exception as e:
             logger.error(f"Failed to generate QR code: {str(e)}", exc_info=True)
             return jsonify({'error': 'Failed to generate QR code'}), 500
@@ -440,12 +450,15 @@ def create_app(storage_path=None, secret_key=None):
             })
 
         except Exception as e:
-            logger.error(f"Failed to remove TOTP: {str(e)}", exc_info=True)
-            return jsonify({'error': 'Failed to remove TOTP'}), 500
+            logger.error(f"Failed to check TOTP status: {str(e)}", exc_info=True)
+            return jsonify({'error': 'Failed to check TOTP status'}), 500
 
     @app.route('/api/vault/usbkey/devices', methods=['GET'])
     def list_usb_devices():
         """List available USB devices"""
+        if 'authenticated' not in session:
+            return jsonify({'error': 'Not authenticated'}), 401
+
         try:
             storage_manager = StorageManager(app.config['STORAGE_PATH'])
             config_dir = storage_manager.storage_path.parent
@@ -506,6 +519,9 @@ def create_app(storage_path=None, secret_key=None):
     @app.route('/api/vault/usbkey/status', methods=['GET'])
     def usb_key_status():
         """Check USB key registration status"""
+        if 'authenticated' not in session:
+            return jsonify({'error': 'Not authenticated'}), 401
+
         try:
             storage_manager = StorageManager(app.config['STORAGE_PATH'])
             config_dir = storage_manager.storage_path.parent
