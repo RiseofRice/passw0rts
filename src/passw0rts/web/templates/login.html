@@ -181,6 +181,9 @@
             }
         } catch (error) {
             console.error('Failed to check vault status:', error);
+            // Show error to user if fetch fails
+            errorDiv.textContent = 'Unable to connect to server. Please check your connection and refresh the page.';
+            errorDiv.style.display = 'block';
         }
     }
     

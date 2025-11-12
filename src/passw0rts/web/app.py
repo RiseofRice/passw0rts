@@ -300,7 +300,13 @@ def create_app(storage_path=None, secret_key=None):
 
     @app.route('/api/vault/status', methods=['GET'])
     def vault_status():
-        """Check if vault exists"""
+        """
+        Check if vault exists.
+        
+        Note: This endpoint is intentionally unauthenticated to support the
+        initialization flow where users need to be redirected to /init if no
+        vault exists. This is required before authentication is possible.
+        """
         storage_manager = StorageManager(app.config['STORAGE_PATH'])
         return jsonify({
             'exists': storage_manager.storage_path.exists()
