@@ -9,7 +9,7 @@ from flask_cors import CORS
 from datetime import timedelta
 
 from passw0rts.core import StorageManager, PasswordEntry
-from passw0rts.utils import PasswordGenerator, TOTPManager
+from passw0rts.utils import PasswordGenerator, TOTPManager, USBKeyManager
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -78,6 +78,11 @@ def create_app(storage_path=None, secret_key=None):
         if 'authenticated' not in session:
             return render_template('login.html')
         return render_template('dashboard.html')
+
+    @app.route('/init')
+    def init_page():
+        """Vault initialization page"""
+        return render_template('init.html')
 
     @app.route('/api/auth/login', methods=['POST'])
     def login():
@@ -292,6 +297,274 @@ def create_app(storage_path=None, secret_key=None):
             'password': password,
             'strength': {'label': label, 'score': score}
         })
+
+    @app.route('/api/vault/status', methods=['GET'])
+    def vault_status():
+        """
+        Check if vault exists.
+        
+        Note: This endpoint is intentionally unauthenticated to support the
+        initialization flow where users need to be redirected to /init if no
+        vault exists. This is required before authentication is possible.
+        """
+        storage_manager = StorageManager(app.config['STORAGE_PATH'])
+        return jsonify({
+            'exists': storage_manager.storage_path.exists()
+        })
+
+    @app.route('/api/vault/init', methods=['POST'])
+    def init_vault():
+        """Initialize a new vault"""
+        data = request.json
+        master_password = data.get('master_password')
+
+        if not master_password:
+            return jsonify({'error': 'Master password required'}), 400
+
+        try:
+            storage_manager = StorageManager(app.config['STORAGE_PATH'])
+
+            if storage_manager.storage_path.exists():
+                return jsonify({'error': 'Vault already exists'}), 400
+
+            # Initialize vault
+            storage_manager.initialize(master_password)
+
+            # Set up TOTP if requested
+            totp_secret = None
+            if data.get('enable_totp', False):
+                totp_manager = TOTPManager()
+                totp_secret = totp_manager.get_secret()
+
+                # Save TOTP secret with secure permissions
+                config_dir = storage_manager.storage_path.parent
+                config_file = config_dir / "config.totp"
+                config_file.write_text(totp_secret)
+                config_file.chmod(0o600)  # Restrict to owner only
+
+            return jsonify({
+                'success': True,
+                'totp_secret': totp_secret
+            })
+
+        except Exception as e:
+            logger.error(f"Failed to initialize vault: {str(e)}", exc_info=True)
+            return jsonify({'error': 'Failed to initialize vault'}), 500
+
+    @app.route('/api/vault/totp/qrcode', methods=['POST'])
+    def get_totp_qrcode():
+        """Get TOTP QR code for a secret"""
+        # Note: This endpoint is used during vault initialization (before authentication)
+        # and after authentication. We check if Pillow is available and provide helpful error.
+        data = request.json
+        secret = data.get('secret')
+
+        if not secret:
+            return jsonify({'error': 'TOTP secret required'}), 400
+
+        try:
+            import base64
+            totp_manager = TOTPManager(secret)
+            qr_bytes = totp_manager.generate_qr_code('passw0rts')
+            qr_base64 = base64.b64encode(qr_bytes).decode('utf-8')
+
+            return jsonify({
+                'qr_code': f'data:image/png;base64,{qr_base64}',
+                'uri': totp_manager.get_provisioning_uri('passw0rts')
+            })
+
+        except ImportError as e:
+            # Provide helpful error message if Pillow is not installed
+            logger.error(f"Pillow not installed: {str(e)}", exc_info=True)
+            return jsonify({
+                'error': 'QR code generation requires Pillow. Install it with: pip install pillow',
+                'uri': TOTPManager(secret).get_provisioning_uri('passw0rts'),
+                'secret': secret
+            }), 500
+        except Exception as e:
+            logger.error(f"Failed to generate QR code: {str(e)}", exc_info=True)
+            return jsonify({'error': 'Failed to generate QR code'}), 500
+
+    @app.route('/api/vault/totp/setup', methods=['POST'])
+    def setup_totp():
+        """Setup TOTP for existing vault"""
+        if 'authenticated' not in session:
+            return jsonify({'error': 'Not authenticated'}), 401
+
+        storage_manager = get_storage_manager()
+        if not storage_manager:
+            return jsonify({'error': 'Session expired'}), 401
+
+        try:
+            totp_manager = TOTPManager()
+            secret = totp_manager.get_secret()
+
+            # Save TOTP secret with secure permissions
+            config_dir = storage_manager.storage_path.parent
+            config_file = config_dir / "config.totp"
+            config_file.write_text(secret)
+            config_file.chmod(0o600)  # Restrict to owner only
+
+            return jsonify({
+                'success': True,
+                'secret': secret
+            })
+
+        except Exception as e:
+            logger.error(f"Failed to setup TOTP: {str(e)}", exc_info=True)
+            return jsonify({'error': 'Failed to setup TOTP'}), 500
+
+    @app.route('/api/vault/totp/remove', methods=['POST'])
+    def remove_totp():
+        """Remove TOTP from vault"""
+        if 'authenticated' not in session:
+            return jsonify({'error': 'Not authenticated'}), 401
+
+        storage_manager = get_storage_manager()
+        if not storage_manager:
+            return jsonify({'error': 'Session expired'}), 401
+
+        try:
+            config_dir = storage_manager.storage_path.parent
+            config_file = config_dir / "config.totp"
+
+            if config_file.exists():
+                config_file.unlink()
+
+            return jsonify({'success': True})
+
+        except Exception as e:
+            logger.error(f"Failed to remove TOTP: {str(e)}", exc_info=True)
+            return jsonify({'error': 'Failed to remove TOTP'}), 500
+
+    @app.route('/api/vault/totp/status', methods=['GET'])
+    def totp_status():
+        """Check TOTP configuration status"""
+        if 'authenticated' not in session:
+            return jsonify({'error': 'Not authenticated'}), 401
+
+        storage_manager = get_storage_manager()
+        if not storage_manager:
+            return jsonify({'error': 'Session expired'}), 401
+
+        try:
+            config_dir = storage_manager.storage_path.parent
+            config_file = config_dir / "config.totp"
+
+            return jsonify({
+                'enabled': config_file.exists()
+            })
+
+        except Exception as e:
+            logger.error(f"Failed to check TOTP status: {str(e)}", exc_info=True)
+            return jsonify({'error': 'Failed to check TOTP status'}), 500
+
+    @app.route('/api/vault/usbkey/devices', methods=['GET'])
+    def list_usb_devices():
+        """List available USB devices"""
+        if 'authenticated' not in session:
+            return jsonify({'error': 'Not authenticated'}), 401
+
+        try:
+            storage_manager = StorageManager(app.config['STORAGE_PATH'])
+            config_dir = storage_manager.storage_path.parent
+            usb_manager = USBKeyManager(str(config_dir / "config.usbkey"))
+
+            devices = usb_manager.list_available_devices()
+            device_list = [str(device) for device in devices]
+
+            return jsonify({
+                'devices': device_list,
+                'count': len(device_list)
+            })
+
+        except Exception as e:
+            logger.error(f"Failed to list USB devices: {str(e)}", exc_info=True)
+            return jsonify({'error': 'Failed to list USB devices'}), 500
+
+    @app.route('/api/vault/usbkey/register', methods=['POST'])
+    def register_usb_key():
+        """Register a USB security key"""
+        if 'authenticated' not in session:
+            return jsonify({'error': 'Not authenticated'}), 401
+
+        storage_manager = get_storage_manager()
+        if not storage_manager:
+            return jsonify({'error': 'Session expired'}), 401
+
+        data = request.json
+        device_index = data.get('device_index')
+        master_password = data.get('master_password')
+
+        if device_index is None:
+            return jsonify({'error': 'Device index required'}), 400
+
+        if not master_password:
+            return jsonify({'error': 'Master password required'}), 400
+
+        try:
+            config_dir = storage_manager.storage_path.parent
+            usb_manager = USBKeyManager(str(config_dir / "config.usbkey"))
+
+            devices = usb_manager.list_available_devices()
+            if device_index < 0 or device_index >= len(devices):
+                return jsonify({'error': 'Invalid device index'}), 400
+
+            selected_device = devices[device_index]
+            usb_manager.register_device(selected_device, master_password)
+
+            return jsonify({
+                'success': True,
+                'device': str(selected_device)
+            })
+
+        except Exception as e:
+            logger.error(f"Failed to register USB key: {str(e)}", exc_info=True)
+            return jsonify({'error': 'Failed to register USB key'}), 500
+
+    @app.route('/api/vault/usbkey/status', methods=['GET'])
+    def usb_key_status():
+        """Check USB key registration status"""
+        if 'authenticated' not in session:
+            return jsonify({'error': 'Not authenticated'}), 401
+
+        try:
+            storage_manager = StorageManager(app.config['STORAGE_PATH'])
+            config_dir = storage_manager.storage_path.parent
+            usb_manager = USBKeyManager(str(config_dir / "config.usbkey"))
+
+            is_registered = usb_manager.is_device_registered()
+            is_connected = is_registered and usb_manager.is_registered_device_connected()
+
+            return jsonify({
+                'registered': is_registered,
+                'connected': is_connected
+            })
+
+        except Exception as e:
+            logger.error(f"Failed to check USB key status: {str(e)}", exc_info=True)
+            return jsonify({'error': 'Failed to check USB key status'}), 500
+
+    @app.route('/api/vault/usbkey/remove', methods=['POST'])
+    def remove_usb_key():
+        """Remove USB security key registration"""
+        if 'authenticated' not in session:
+            return jsonify({'error': 'Not authenticated'}), 401
+
+        storage_manager = get_storage_manager()
+        if not storage_manager:
+            return jsonify({'error': 'Session expired'}), 401
+
+        try:
+            config_dir = storage_manager.storage_path.parent
+            usb_manager = USBKeyManager(str(config_dir / "config.usbkey"))
+            usb_manager.unregister_device()
+
+            return jsonify({'success': True})
+
+        except Exception as e:
+            logger.error(f"Failed to remove USB key: {str(e)}", exc_info=True)
+            return jsonify({'error': 'Failed to remove USB key'}), 500
 
     return app
 

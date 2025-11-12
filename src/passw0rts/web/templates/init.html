@@ -1,0 +1,629 @@
+{% extends "base.html" %}
+
+{% block title %}Initialize Vault - Passw0rts{% endblock %}
+
+{% block styles %}
+<style>
+    body {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+        background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
+    }
+    
+    .init-container {
+        max-width: 600px;
+        width: 100%;
+        margin: var(--spacing-base);
+        padding: calc(var(--spacing-base) * 2);
+        background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%);
+        border-radius: calc(var(--border-radius) * 2);
+        box-shadow: 0 20px 60px var(--shadow-hover);
+        border: 1px solid var(--border-color);
+        animation: slideDown 0.5s ease-out;
+    }
+    
+    @keyframes slideDown {
+        from {
+            opacity: 0;
+            transform: translateY(-30px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+    
+    .init-header {
+        text-align: center;
+        margin-bottom: calc(var(--spacing-base) * 1.5);
+    }
+    
+    .init-header h1 {
+        font-size: calc(var(--font-size-base) * 2.3);
+        margin-bottom: calc(var(--spacing-base) * 0.5);
+        background: linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+    
+    .init-header p {
+        color: var(--text-secondary);
+        font-size: calc(var(--font-size-base) * 1.1);
+    }
+    
+    .error-message, .success-message {
+        padding: calc(var(--spacing-base) * 0.75);
+        border-radius: var(--border-radius);
+        margin-bottom: calc(var(--spacing-base) * 0.75);
+        display: none;
+        animation: shake 0.5s;
+    }
+    
+    .error-message {
+        background-color: var(--danger);
+        color: white;
+    }
+    
+    .success-message {
+        background-color: var(--success);
+        color: white;
+    }
+    
+    @keyframes shake {
+        0%, 100% { transform: translateX(0); }
+        25% { transform: translateX(-10px); }
+        75% { transform: translateX(10px); }
+    }
+    
+    .option-box {
+        background-color: var(--bg-tertiary);
+        border: 1px solid var(--border-color);
+        border-radius: var(--border-radius);
+        padding: var(--spacing-base);
+        margin-bottom: var(--spacing-base);
+    }
+    
+    .option-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: calc(var(--spacing-base) * 0.5);
+    }
+    
+    .option-title {
+        font-size: calc(var(--font-size-base) * 1.1);
+        font-weight: 600;
+        color: var(--text-primary);
+    }
+    
+    .option-description {
+        color: var(--text-secondary);
+        font-size: calc(var(--font-size-base) * 0.95);
+        line-height: 1.5;
+    }
+    
+    .toggle-switch {
+        position: relative;
+        display: inline-block;
+        width: 50px;
+        height: 24px;
+    }
+    
+    .toggle-switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+    }
+    
+    .slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: var(--bg-primary);
+        transition: var(--transition-speed);
+        border-radius: 24px;
+        border: 1px solid var(--border-color);
+    }
+    
+    .slider:before {
+        position: absolute;
+        content: "";
+        height: 16px;
+        width: 16px;
+        left: 3px;
+        bottom: 3px;
+        background-color: var(--text-secondary);
+        transition: var(--transition-speed);
+        border-radius: 50%;
+    }
+    
+    input:checked + .slider {
+        background-color: var(--accent);
+    }
+    
+    input:checked + .slider:before {
+        transform: translateX(26px);
+        background-color: white;
+    }
+    
+    .qr-container {
+        display: none;
+        text-align: center;
+        margin-top: var(--spacing-base);
+        padding: var(--spacing-base);
+        background-color: white;
+        border-radius: var(--border-radius);
+    }
+    
+    .qr-container img {
+        max-width: 100%;
+        height: auto;
+    }
+    
+    .secret-display {
+        background-color: var(--bg-primary);
+        padding: calc(var(--spacing-base) * 0.5);
+        border-radius: var(--border-radius);
+        margin-top: calc(var(--spacing-base) * 0.5);
+        word-break: break-all;
+        font-family: monospace;
+        color: var(--accent);
+    }
+    
+    .password-strength {
+        margin-top: calc(var(--spacing-base) * 0.5);
+        font-size: calc(var(--font-size-base) * 0.9);
+    }
+    
+    .strength-bar {
+        height: 4px;
+        background-color: var(--bg-tertiary);
+        border-radius: 2px;
+        margin-top: 4px;
+        overflow: hidden;
+    }
+    
+    .strength-fill {
+        height: 100%;
+        width: 0%;
+        transition: width var(--transition-speed), background-color var(--transition-speed);
+        border-radius: 2px;
+    }
+    
+    .usb-device-list {
+        display: none;
+        margin-top: var(--spacing-base);
+    }
+    
+    .device-item {
+        background-color: var(--bg-primary);
+        padding: calc(var(--spacing-base) * 0.75);
+        border: 1px solid var(--border-color);
+        border-radius: var(--border-radius);
+        margin-bottom: calc(var(--spacing-base) * 0.5);
+        cursor: pointer;
+        transition: all var(--transition-speed);
+    }
+    
+    .device-item:hover {
+        border-color: var(--accent);
+        background-color: var(--bg-secondary);
+    }
+    
+    .device-item.selected {
+        border-color: var(--accent);
+        background-color: var(--accent-light);
+    }
+</style>
+{% endblock %}
+
+{% block body %}
+<div class="init-container">
+    <div class="init-header">
+        <h1>🔐 Initialize Vault</h1>
+        <p>Set up your secure password vault</p>
+    </div>
+    
+    <div id="error-message" class="error-message"></div>
+    <div id="success-message" class="success-message"></div>
+    
+    <form id="init-form">
+        <label for="master-password">Master Password *</label>
+        <input type="password" id="master-password" required autofocus>
+        
+        <div class="password-strength">
+            <div class="strength-bar">
+                <div id="strength-fill" class="strength-fill"></div>
+            </div>
+            <span id="strength-label"></span>
+        </div>
+        
+        <label for="master-password-confirm">Confirm Master Password *</label>
+        <input type="password" id="master-password-confirm" required>
+        
+        <div class="option-box">
+            <div class="option-header">
+                <div class="option-title">🔒 Enable TOTP 2FA</div>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="enable-totp" checked>
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <div class="option-description">
+                Time-based One-Time Password provides an extra layer of security. Recommended for enhanced protection.
+            </div>
+            <div id="totp-container" class="qr-container">
+                <div id="qr-content" style="display: none;">
+                    <p style="color: #333; margin-bottom: 10px;">Scan this QR code with your authenticator app:</p>
+                    <img id="qr-code" src="" alt="TOTP QR Code">
+                    <div class="secret-display">
+                        Secret: <span id="totp-secret"></span>
+                    </div>
+                    <div id="totp-verification" style="margin-top: 20px; display: none;">
+                        <label for="totp-verify-code" style="display: block; margin-bottom: 8px; color: var(--text-primary); font-weight: 600;">
+                            Enter code from your authenticator app to verify:
+                        </label>
+                        <input type="text" id="totp-verify-code" placeholder="6-digit code" maxlength="6" 
+                               style="width: 100%; padding: 12px; border: 1px solid var(--border-color); border-radius: var(--border-radius); background-color: var(--bg-secondary); color: var(--text-primary); font-size: 18px; text-align: center; letter-spacing: 4px;">
+                        <button type="button" id="verify-totp-btn" class="button" style="width: 100%; margin-top: 12px;">
+                            ✓ Verify TOTP Code
+                        </button>
+                        <p id="totp-verify-status" style="margin-top: 8px; text-align: center;"></p>
+                    </div>
+                </div>
+                <p id="qr-placeholder" style="color: var(--text-secondary); margin: 20px 0;">
+                    QR code will be displayed here after vault initialization.
+                </p>
+            </div>
+        </div>
+        
+        <div class="option-box">
+            <div class="option-header">
+                <div class="option-title">🔑 Register USB Security Key</div>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="enable-usbkey">
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <div class="option-description">
+                Hardware-based authentication using YubiKey or other USB security devices. Allows password-optional unlock when connected.
+            </div>
+            <div id="usb-device-list" class="usb-device-list">
+                <button type="button" class="button" id="scan-devices" style="width: 100%; margin-bottom: 10px;">
+                    🔍 Scan for USB Devices
+                </button>
+                <div id="devices-container"></div>
+            </div>
+        </div>
+        
+        <button type="submit" class="button button-icon" style="width: 100%;">
+            ✨ Initialize Vault
+        </button>
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const form = document.getElementById('init-form');
+    const errorDiv = document.getElementById('error-message');
+    const successDiv = document.getElementById('success-message');
+    const masterPasswordInput = document.getElementById('master-password');
+    const confirmPasswordInput = document.getElementById('master-password-confirm');
+    const enableTotpCheckbox = document.getElementById('enable-totp');
+    const totpContainer = document.getElementById('totp-container');
+    const enableUsbKeyCheckbox = document.getElementById('enable-usbkey');
+    const usbDeviceList = document.getElementById('usb-device-list');
+    const scanDevicesBtn = document.getElementById('scan-devices');
+    const devicesContainer = document.getElementById('devices-container');
+    const strengthFill = document.getElementById('strength-fill');
+    const strengthLabel = document.getElementById('strength-label');
+    
+    let selectedDeviceIndex = null;
+    let totpSecret = null;
+    
+    // Password strength indicator
+    masterPasswordInput.addEventListener('input', () => {
+        const password = masterPasswordInput.value;
+        if (!password) {
+            strengthFill.style.width = '0%';
+            strengthLabel.textContent = '';
+            return;
+        }
+        
+        // Simple strength calculation
+        let strength = 0;
+        if (password.length >= 8) strength += 25;
+        if (password.length >= 12) strength += 25;
+        if (/[a-z]/.test(password) && /[A-Z]/.test(password)) strength += 20;
+        if (/\d/.test(password)) strength += 15;
+        if (/[^a-zA-Z0-9]/.test(password)) strength += 15;
+        
+        strengthFill.style.width = strength + '%';
+        
+        if (strength < 40) {
+            strengthFill.style.backgroundColor = 'var(--danger)';
+            strengthLabel.textContent = 'Weak';
+            strengthLabel.style.color = 'var(--danger)';
+        } else if (strength < 70) {
+            strengthFill.style.backgroundColor = 'var(--warning)';
+            strengthLabel.textContent = 'Medium';
+            strengthLabel.style.color = 'var(--warning)';
+        } else {
+            strengthFill.style.backgroundColor = 'var(--success)';
+            strengthLabel.textContent = 'Strong';
+            strengthLabel.style.color = 'var(--success)';
+        }
+    });
+    
+    // Toggle TOTP option
+    enableTotpCheckbox.addEventListener('change', () => {
+        if (enableTotpCheckbox.checked) {
+            totpContainer.style.display = 'block';
+        } else {
+            totpContainer.style.display = 'none';
+        }
+    });
+    
+    // Initialize TOTP container visibility on page load
+    if (enableTotpCheckbox.checked) {
+        totpContainer.style.display = 'block';
+    }
+    
+    // Toggle USB key option
+    enableUsbKeyCheckbox.addEventListener('change', () => {
+        if (enableUsbKeyCheckbox.checked) {
+            usbDeviceList.style.display = 'block';
+        } else {
+            usbDeviceList.style.display = 'none';
+            selectedDeviceIndex = null;
+        }
+    });
+    
+    // Scan for USB devices
+    scanDevicesBtn.addEventListener('click', async () => {
+        scanDevicesBtn.disabled = true;
+        scanDevicesBtn.textContent = '🔍 Scanning...';
+        
+        try {
+            const response = await fetch('/api/vault/usbkey/devices');
+            const data = await response.json();
+            
+            devicesContainer.innerHTML = '';
+            
+            if (data.devices && data.devices.length > 0) {
+                data.devices.forEach((device, index) => {
+                    const deviceItem = document.createElement('div');
+                    deviceItem.className = 'device-item';
+                    deviceItem.textContent = device;
+                    deviceItem.onclick = () => {
+                        document.querySelectorAll('.device-item').forEach(item => {
+                            item.classList.remove('selected');
+                        });
+                        deviceItem.classList.add('selected');
+                        selectedDeviceIndex = index;
+                    };
+                    devicesContainer.appendChild(deviceItem);
+                });
+            } else {
+                devicesContainer.innerHTML = '<p style="color: var(--text-secondary);">No USB devices found. Make sure your device is plugged in.</p>';
+            }
+            
+            scanDevicesBtn.textContent = '🔍 Scan for USB Devices';
+            scanDevicesBtn.disabled = false;
+        } catch (error) {
+            devicesContainer.innerHTML = '<p style="color: var(--danger);">Failed to scan devices: ' + error.message + '</p>';
+            scanDevicesBtn.textContent = '🔍 Scan for USB Devices';
+            scanDevicesBtn.disabled = false;
+        }
+    });
+    
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const masterPassword = masterPasswordInput.value;
+        const confirmPassword = confirmPasswordInput.value;
+        
+        // Validate passwords match
+        if (masterPassword !== confirmPassword) {
+            errorDiv.textContent = 'Passwords do not match!';
+            errorDiv.style.display = 'block';
+            successDiv.style.display = 'none';
+            return;
+        }
+        
+        // Validate USB key selection if enabled
+        if (enableUsbKeyCheckbox.checked && selectedDeviceIndex === null) {
+            errorDiv.textContent = 'Please select a USB device or disable USB key option';
+            errorDiv.style.display = 'block';
+            successDiv.style.display = 'none';
+            return;
+        }
+        
+        // Show loading state
+        const submitBtn = form.querySelector('button[type="submit"]');
+        const originalText = submitBtn.innerHTML;
+        submitBtn.innerHTML = '⏳ Initializing...';
+        submitBtn.disabled = true;
+        
+        try {
+            // Step 1: Initialize vault
+            const initResponse = await fetch('/api/vault/init', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    master_password: masterPassword,
+                    enable_totp: enableTotpCheckbox.checked
+                })
+            });
+            
+            const initData = await initResponse.json();
+            
+            if (!initResponse.ok) {
+                throw new Error(initData.error || 'Failed to initialize vault');
+            }
+            
+            // Step 2: Display TOTP QR code if enabled
+            if (enableTotpCheckbox.checked && initData.totp_secret) {
+                totpSecret = initData.totp_secret;
+                document.getElementById('totp-secret').textContent = totpSecret;
+                
+                try {
+                    const qrResponse = await fetch('/api/vault/totp/qrcode', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            secret: totpSecret
+                        })
+                    });
+                    
+                    const qrData = await qrResponse.json();
+                    if (qrResponse.ok) {
+                        document.getElementById('qr-code').src = qrData.qr_code;
+                        // Show QR content and hide placeholder
+                        document.getElementById('qr-content').style.display = 'block';
+                        document.getElementById('qr-placeholder').style.display = 'none';
+                    } else {
+                        // QR code generation failed, but we have the secret
+                        console.warn('QR code generation failed:', qrData.error);
+                        // Show the content with secret even without QR
+                        document.getElementById('qr-content').style.display = 'block';
+                        document.getElementById('qr-placeholder').style.display = 'none';
+                        if (qrData.uri) {
+                            // Show the URI as fallback
+                            const qrContainer = document.getElementById('totp-container');
+                            const fallbackMsg = document.createElement('p');
+                            fallbackMsg.style.color = 'var(--warning)';
+                            fallbackMsg.textContent = 'QR code generation failed. Use the secret above or this URI: ' + qrData.uri;
+                            qrContainer.appendChild(fallbackMsg);
+                        }
+                    }
+                } catch (qrError) {
+                    console.error('QR code generation error:', qrError);
+                    // Show the secret even if QR generation fails
+                    document.getElementById('qr-content').style.display = 'block';
+                    document.getElementById('qr-placeholder').style.display = 'none';
+                }
+                
+                // Show TOTP verification section and wait for user to verify
+                document.getElementById('totp-verification').style.display = 'block';
+                submitBtn.innerHTML = '⏳ Waiting for TOTP verification...';
+                submitBtn.disabled = true;
+                
+                // Set up TOTP verification handler
+                await new Promise((resolve, reject) => {
+                    const verifyBtn = document.getElementById('verify-totp-btn');
+                    const verifyStatus = document.getElementById('totp-verify-status');
+                    const verifyInput = document.getElementById('totp-verify-code');
+                    
+                    verifyBtn.onclick = async () => {
+                        const code = verifyInput.value.trim();
+                        
+                        if (!code || code.length !== 6) {
+                            verifyStatus.textContent = '⚠️ Please enter a 6-digit code';
+                            verifyStatus.style.color = 'var(--warning)';
+                            return;
+                        }
+                        
+                        verifyBtn.disabled = true;
+                        verifyBtn.textContent = '⏳ Verifying...';
+                        
+                        try {
+                            // Verify TOTP code by trying to login
+                            const loginResponse = await fetch('/api/auth/login', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                },
+                                body: JSON.stringify({
+                                    master_password: masterPassword,
+                                    totp_code: code
+                                })
+                            });
+                            
+                            if (loginResponse.ok) {
+                                verifyStatus.textContent = '✅ TOTP verified successfully!';
+                                verifyStatus.style.color = 'var(--success)';
+                                resolve();
+                            } else {
+                                const errorData = await loginResponse.json();
+                                verifyStatus.textContent = '❌ Invalid code. Please try again.';
+                                verifyStatus.style.color = 'var(--danger)';
+                                verifyBtn.disabled = false;
+                                verifyBtn.textContent = '✓ Verify TOTP Code';
+                            }
+                        } catch (error) {
+                            verifyStatus.textContent = '❌ Verification failed: ' + error.message;
+                            verifyStatus.style.color = 'var(--danger)';
+                            verifyBtn.disabled = false;
+                            verifyBtn.textContent = '✓ Verify TOTP Code';
+                        }
+                    };
+                });
+            }
+            
+            // Step 3: Register USB key if enabled (need to authenticate first)
+            let usbKeyRegistered = false;
+            if (enableUsbKeyCheckbox.checked && selectedDeviceIndex !== null) {
+                try {
+                    // Now register the USB key (we're already authenticated if TOTP was enabled)
+                    const usbResponse = await fetch('/api/vault/usbkey/register', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            device_index: selectedDeviceIndex,
+                            master_password: masterPassword
+                        })
+                    });
+                    
+                    if (usbResponse.ok) {
+                        usbKeyRegistered = true;
+                    } else {
+                        const usbData = await usbResponse.json();
+                        console.error('USB key registration failed:', usbData.error);
+                    }
+                } catch (usbError) {
+                    console.error('USB key registration error:', usbError);
+                    // Don't fail the whole initialization for USB key errors
+                }
+            }
+            
+            submitBtn.innerHTML = '✅ Success!';
+            let successMessage = 'Vault initialized successfully!';
+            if (enableTotpCheckbox.checked) {
+                successMessage += ' TOTP 2FA has been enabled and verified.';
+            }
+            if (enableUsbKeyCheckbox.checked && selectedDeviceIndex !== null && !usbKeyRegistered) {
+                successMessage += ' However, USB key registration was skipped. You can register it later from the dashboard.';
+            }
+            successMessage += ' Redirecting to login...';
+            successDiv.textContent = successMessage;
+            successDiv.style.display = 'block';
+            errorDiv.style.display = 'none';
+            
+            setTimeout(() => {
+                window.location.href = '/';
+            }, 2000);
+            
+        } catch (error) {
+            submitBtn.innerHTML = originalText;
+            submitBtn.disabled = false;
+            errorDiv.textContent = error.message;
+            errorDiv.style.display = 'block';
+            successDiv.style.display = 'none';
+        }
+    });
+</script>
+{% endblock %}
