@@ -265,6 +265,17 @@
                     <div class="secret-display">
                         Secret: <span id="totp-secret"></span>
                     </div>
+                    <div id="totp-verification" style="margin-top: 20px; display: none;">
+                        <label for="totp-verify-code" style="display: block; margin-bottom: 8px; color: var(--text-primary); font-weight: 600;">
+                            Enter code from your authenticator app to verify:
+                        </label>
+                        <input type="text" id="totp-verify-code" placeholder="6-digit code" maxlength="6" 
+                               style="width: 100%; padding: 12px; border: 1px solid var(--border-color); border-radius: var(--border-radius); background-color: var(--bg-secondary); color: var(--text-primary); font-size: 18px; text-align: center; letter-spacing: 4px;">
+                        <button type="button" id="verify-totp-btn" class="button" style="width: 100%; margin-top: 12px;">
+                            ✓ Verify TOTP Code
+                        </button>
+                        <p id="totp-verify-status" style="margin-top: 8px; text-align: center;"></p>
+                    </div>
                 </div>
                 <p id="qr-placeholder" style="color: var(--text-secondary); margin: 20px 0;">
                     QR code will be displayed here after vault initialization.
@@ -503,44 +514,85 @@
                     document.getElementById('qr-content').style.display = 'block';
                     document.getElementById('qr-placeholder').style.display = 'none';
                 }
+                
+                // Show TOTP verification section and wait for user to verify
+                document.getElementById('totp-verification').style.display = 'block';
+                submitBtn.innerHTML = '⏳ Waiting for TOTP verification...';
+                submitBtn.disabled = true;
+                
+                // Set up TOTP verification handler
+                await new Promise((resolve, reject) => {
+                    const verifyBtn = document.getElementById('verify-totp-btn');
+                    const verifyStatus = document.getElementById('totp-verify-status');
+                    const verifyInput = document.getElementById('totp-verify-code');
+                    
+                    verifyBtn.onclick = async () => {
+                        const code = verifyInput.value.trim();
+                        
+                        if (!code || code.length !== 6) {
+                            verifyStatus.textContent = '⚠️ Please enter a 6-digit code';
+                            verifyStatus.style.color = 'var(--warning)';
+                            return;
+                        }
+                        
+                        verifyBtn.disabled = true;
+                        verifyBtn.textContent = '⏳ Verifying...';
+                        
+                        try {
+                            // Verify TOTP code by trying to login
+                            const loginResponse = await fetch('/api/auth/login', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                },
+                                body: JSON.stringify({
+                                    master_password: masterPassword,
+                                    totp_code: code
+                                })
+                            });
+                            
+                            if (loginResponse.ok) {
+                                verifyStatus.textContent = '✅ TOTP verified successfully!';
+                                verifyStatus.style.color = 'var(--success)';
+                                resolve();
+                            } else {
+                                const errorData = await loginResponse.json();
+                                verifyStatus.textContent = '❌ Invalid code. Please try again.';
+                                verifyStatus.style.color = 'var(--danger)';
+                                verifyBtn.disabled = false;
+                                verifyBtn.textContent = '✓ Verify TOTP Code';
+                            }
+                        } catch (error) {
+                            verifyStatus.textContent = '❌ Verification failed: ' + error.message;
+                            verifyStatus.style.color = 'var(--danger)';
+                            verifyBtn.disabled = false;
+                            verifyBtn.textContent = '✓ Verify TOTP Code';
+                        }
+                    };
+                });
             }
             
             // Step 3: Register USB key if enabled (need to authenticate first)
             let usbKeyRegistered = false;
             if (enableUsbKeyCheckbox.checked && selectedDeviceIndex !== null) {
                 try {
-                    // First, login to get authenticated session
-                    const loginResponse = await fetch('/api/auth/login', {
+                    // Now register the USB key (we're already authenticated if TOTP was enabled)
+                    const usbResponse = await fetch('/api/vault/usbkey/register', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
                         },
                         body: JSON.stringify({
+                            device_index: selectedDeviceIndex,
                             master_password: masterPassword
                         })
                     });
                     
-                    if (loginResponse.ok) {
-                        // Now register the USB key
-                        const usbResponse = await fetch('/api/vault/usbkey/register', {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                            },
-                            body: JSON.stringify({
-                                device_index: selectedDeviceIndex,
-                                master_password: masterPassword
-                            })
-                        });
-                        
-                        if (usbResponse.ok) {
-                            usbKeyRegistered = true;
-                        } else {
-                            const usbData = await usbResponse.json();
-                            console.error('USB key registration failed:', usbData.error);
-                        }
+                    if (usbResponse.ok) {
+                        usbKeyRegistered = true;
                     } else {
-                        console.warn('Login failed, USB key registration skipped');
+                        const usbData = await usbResponse.json();
+                        console.error('USB key registration failed:', usbData.error);
                     }
                 } catch (usbError) {
                     console.error('USB key registration error:', usbError);
@@ -550,6 +602,9 @@
             
             submitBtn.innerHTML = '✅ Success!';
             let successMessage = 'Vault initialized successfully!';
+            if (enableTotpCheckbox.checked) {
+                successMessage += ' TOTP 2FA has been enabled and verified.';
+            }
             if (enableUsbKeyCheckbox.checked && selectedDeviceIndex !== null && !usbKeyRegistered) {
                 successMessage += ' However, USB key registration was skipped. You can register it later from the dashboard.';
             }
